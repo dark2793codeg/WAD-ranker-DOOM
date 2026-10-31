@@ -33,3 +33,10 @@ export function requireAdmin(req, res) {
   if (!isAdmin(req)) { res.status(401).json({ error: "Log in to make changes." }); return false; }
   return true;
 }
+
+// Blob token: the default name, or any custom-prefixed one Vercel adds when a store is connected
+export function blobToken() {
+  if (process.env.BLOB_READ_WRITE_TOKEN) return process.env.BLOB_READ_WRITE_TOKEN;
+  const k = Object.keys(process.env).find(k => k.endsWith("_READ_WRITE_TOKEN") && String(process.env[k]).startsWith("vercel_blob_rw_"));
+  return k ? process.env[k] : "";
+}

@@ -1,20 +1,21 @@
 import { put, list, del } from "@vercel/blob";
-import { requireAdmin, isAdmin } from "./_auth.js";
+import { requireAdmin, isAdmin, blobToken } from "./_auth.js";
 
 export const config = { maxDuration: 30 };
 const KEEP = 30; // older saves kept as automatic backups
 
-async function versions() {
+async function versions(token) {
   let blobs = [], cursor;
-  do { const r = await list({ prefix: "state/", cursor, limit: 1000 }); blobs = blobs.concat(r.blobs); cursor = r.hasMore ? r.cursor : undefined; } while (cursor);
+  do { const r = await list({ prefix: "state/", cursor, limit: 1000, token }); blobs = blobs.concat(r.blobs); cursor = r.hasMore ? r.cursor : undefined; } while (cursor);
   return blobs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
 }
 
 export default async function handler(req, res) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return res.status(503).json({ error: "Storage isn't connected to this project." });
+  const token = blobToken();
+  if (!token) return res.status(503).json({ error: "Storage isn't connected to this project." });
   try {
     if (req.method === "GET") {
-      const all = await versions();
+      const all = await versions(token);
       if (req.query.history !== undefined) {
         if (!isAdmin(req)) return res.status(401).json({ error: "Log in first." });
         return res.status(200).json(all.map(b => ({ url: b.url, at: b.uploadedAt, size: b.size })));
@@ -30,10 +31,10 @@ export default async function handler(req, res) {
       const body = req.body;
       if (!body || !Array.isArray(body.wads)) return res.status(400).json({ error: "That doesn't look like catalog data." });
       body.savedAt = new Date().toISOString();
-      const b = await put("state/state.json", JSON.stringify(body), { access: "public", addRandomSuffix: true, contentType: "application/json", cacheControlMaxAge: 31536000 });
-      const all = await versions();
+      const b = await put("state/state.json", JSON.stringify(body), { access: "public", addRandomSuffix: true, contentType: "application/json", cacheControlMaxAge: 31536000, token });
+      const all = await versions(token);
       const old = all.slice(KEEP).map(x => x.url);
-      if (old.length) await del(old);
+      if (old.length) await del(old, { token });
       return res.status(200).json({ ok: true, savedAt: body.savedAt, url: b.url });
     }
     res.status(405).end();
