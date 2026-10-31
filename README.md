@@ -10,6 +10,6 @@ Static page (`index.html`) plus four small Vercel Functions in `api/`.
 ## Vercel setup
 
 1. Import this folder (from its GitHub repo) as a new Vercel project. Framework preset: **Other**. No build command.
-2. Storage tab: create a **Blob** store and connect it to the project. This adds `BLOB_READ_WRITE_TOKEN`.
+2. Storage tab: create a **Blob** store and connect it to the project (all environments). Either kind works: newer stores add `BLOB_STORE_ID` (OIDC), older ones add `BLOB_READ_WRITE_TOKEN`. Public or private access both work; private-store images are served through `/api/img`.
 3. Settings → Environment Variables: add `ADMIN_PASSWORD` (type Sensitive) with the password you'll use to log in.
 4. Redeploy. Open the site, click **Log in**, and edit.
