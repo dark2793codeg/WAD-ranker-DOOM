@@ -1,0 +1,952 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>WAD Ranker &amp; Reviewer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tektur:wght@500;700;800&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Barlow+Semi+Condensed:wght@400;500;600&display=swap">
+</head><body>
+<style>
+/* Layout: sticky status-bar header over a full-width content column; catalogs are dense poster grids, detail pages are titlepic + stat sheet + data table. Single dark look on purpose (a Doom status bar, not a theme). */
+:root{
+  color-scheme:dark;
+  --bg:#15120e;          /* gunmetal brown, Doom HUD backing */
+  --panel:#201b15;
+  --panel-2:#2a231b;
+  --line:#3b3127;
+  --fg:#ece0ca;          /* bone */
+  --muted:#a6957a;
+  --dim:#75674f;
+  --brass:#d2a54b;       /* status-bar brass, primary accent */
+  --brass-ink:#1b1408;
+  --nukage:#86c43f;      /* demo completion */
+  --nukage-bg:#1f2a12;
+  --blood:#d0503c;       /* destructive */
+  --route:#e0b13a;       /* routing & practicing */
+  --t-s:#f2c94c; --t-a:#7fcf62; --t-b:#5cc2b0; --t-c:#d8cf5a; --t-d:#e38a3c; --t-f:#d24b3c;
+  --t-x:#e0457b; --t-e:#7d8fa8;
+  --f-display:"Tektur","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-data:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --r:6px;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--bg)}
+body{background:var(--bg);color:var(--fg);font:16px/1.55 var(--f-body);min-height:100vh}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.wrap{max-width:1400px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* header */
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--panel);border-bottom:2px solid var(--line);box-shadow:0 2px 0 #0006}
+.bar .wrap{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-block:10px}
+.logo{font:700 22px/1 var(--f-display);color:var(--brass);text-decoration:none;letter-spacing:.02em;white-space:nowrap}
+.logo small{display:block;font:500 11px/1.3 var(--f-body);color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+nav.main{display:flex;gap:4px;flex-wrap:wrap}
+nav.main a{text-decoration:none;padding:7px 12px;border-radius:var(--r);color:var(--muted);font-weight:600;font-size:15px}
+nav.main a:hover{color:var(--fg);background:var(--panel-2)}
+nav.main a[aria-current="page"]{color:var(--brass-ink);background:var(--brass)}
+.bar .tools{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.switch{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);cursor:pointer;user-select:none}
+.switch input{appearance:none;width:38px;height:22px;border-radius:11px;background:var(--line);position:relative;cursor:pointer;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--fg);transition:transform .15s}
+.switch input:checked{background:var(--brass)}
+.switch input:checked::after{transform:translateX(16px);background:var(--brass-ink)}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel-2);padding:7px 12px;border-radius:var(--r);cursor:pointer;font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--brass);color:var(--brass-ink);border-color:var(--brass)}
+.btn.danger{color:var(--blood);border-color:#5a2a22}
+.btn.small{padding:4px 8px;font-size:13px}
+.btn.ghost{background:transparent}
+.icon-btn{border:0;background:transparent;cursor:pointer;color:var(--muted);padding:4px 6px;border-radius:4px;font-size:15px;line-height:1}
+.icon-btn:hover{color:var(--fg);background:var(--panel-2)}
+
+main{padding-block:28px 80px}
+h1,h2,h3{text-wrap:balance;margin:0}
+h1{font:700 clamp(30px,4.4vw,52px)/1.05 var(--f-display);letter-spacing:.01em}
+h2{font:700 24px/1.2 var(--f-display);color:var(--brass)}
+h3{font:600 17px/1.3 var(--f-body)}
+.eyebrow{font:600 12px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.stack{display:flex;flex-direction:column;gap:16px}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+section.block{display:flex;flex-direction:column;gap:14px;margin-top:40px}
+.crumbs{font-size:14px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.crumbs a{color:var(--muted)}
+.crumbs a:hover{color:var(--brass)}
+
+/* toolbar */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0 22px}
+.toolbar input[type=search],.toolbar select,.field input,.field select,.field textarea,.cell-in{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:7px 10px;font-size:14px;min-width:0}
+.toolbar input[type=search]{flex:1 1 220px;max-width:340px}
+.count{font:500 14px var(--f-data);color:var(--muted);margin-left:auto}
+
+/* catalog grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(42%,230px),1fr));gap:22px 18px}
+.tile{display:flex;flex-direction:column;gap:8px;text-decoration:none;padding:10px;border-radius:8px;transition:background .12s;position:relative;min-width:0}
+.tile:hover{background:var(--panel-2)}
+.tile .info{min-width:0;display:flex;flex-direction:column;gap:2px}
+.tile .t{font-weight:700;font-size:15px;line-height:1.25;overflow-wrap:anywhere}
+.tile .a{font-size:13px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font:500 12px var(--f-data);color:var(--dim);margin-top:2px}
+.chip{display:inline-block;font:600 11px/1 var(--f-data);letter-spacing:.04em;padding:4px 6px;border-radius:4px;background:var(--panel-2);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.tile.done{background:var(--nukage-bg);box-shadow:inset 0 0 0 1px #4f7a22}
+.tile.done .t{color:var(--nukage)}
+
+.pic{aspect-ratio:4/3;width:100%;max-width:100%;border-radius:6px;overflow:hidden;position:relative;background:var(--panel-2);box-shadow:0 6px 18px #0007}
+.pic img{width:100%;height:100%;object-fit:cover;display:block}
+.ph{position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px;font:700 17px/1.05 var(--f-display);color:#f6ead2;text-shadow:0 2px 0 #0009;overflow:hidden;overflow-wrap:anywhere}
+.ph::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,#0000 0 3px,#00000022 3px 4px);pointer-events:none}
+.badge-grade{position:absolute;top:8px;right:8px;z-index:2}
+
+.progress{height:7px;background:var(--line);border-radius:4px;overflow:hidden}
+.progress>i{display:block;height:100%;background:var(--nukage);border-radius:4px}
+.progress.part>i{background:var(--route)}
+.prog-label{display:flex;justify-content:space-between;font:500 12px var(--f-data);color:var(--muted)}
+
+/* grades */
+.g{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:26px;padding:0 6px;border-radius:5px;font:700 14px/1 var(--f-display);color:#130f0a;background:var(--muted)}
+.g.lg{min-width:58px;height:46px;font-size:26px;border-radius:7px}
+.g.none{background:transparent;border:1px dashed var(--line);color:var(--dim)}
+.g.S{background:var(--t-s)}.g.A{background:var(--t-a)}.g.B{background:var(--t-b)}.g.C{background:var(--t-c)}.g.D{background:var(--t-d)}.g.F{background:var(--t-f)}
+.g.X{background:var(--t-x)}.g.E{background:var(--t-e)}
+.gnum{font:500 13px var(--f-data);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* IWAD cards */
+.iwads{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:22px}
+.iwad{display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr);gap:16px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;text-decoration:none}
+.iwad:hover{border-color:var(--brass)}
+.iwad .excerpt{font-size:14px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+@media (max-width:480px){.iwad{grid-template-columns:1fr}}
+
+/* WAD page */
+.hero{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:32px;align-items:start}
+@media (max-width:820px){.hero{grid-template-columns:1fr}}
+.hero .pic{box-shadow:0 10px 30px #000a}
+.facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px 22px;margin-top:16px}
+.fact .k{font:600 11px/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+.fact .v{font:500 16px/1.3 var(--f-data);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:22px}
+.score{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.score .lbl{font:600 12px/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.score .line{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.score .avg{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.score select{background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:6px 8px}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+table.maps{border-collapse:collapse;width:100%;font:400 14px/1.35 var(--f-data);font-variant-numeric:tabular-nums}
+table.maps th{position:sticky;top:0;background:var(--panel-2);text-align:left;font:600 11px/1.2 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 10px;white-space:nowrap;border-bottom:1px solid var(--line)}
+table.maps td{padding:7px 10px;border-bottom:1px solid #2b241c;vertical-align:middle;white-space:nowrap}
+table.maps td.wrapcell{white-space:normal;min-width:160px;max-width:260px}
+table.maps tr:hover td{background:#ffffff06}
+table.maps td.num,table.maps th.num{text-align:right}
+table.maps a.mapname{font-weight:600;font-size:15px;color:var(--fg);text-decoration:none;border-bottom:1px solid var(--line)}
+table.maps a.mapname:hover{color:var(--brass);border-color:var(--brass)}
+.slot{font:700 13px var(--f-display);color:var(--brass)}
+.st{font:600 12px var(--f-data);padding:3px 7px;border-radius:4px;white-space:nowrap}
+.st.ok{background:var(--nukage-bg);color:var(--nukage)}
+.st.st-rt{background:#3a2e10;color:var(--route)}
+.st.no{background:var(--panel-2);color:var(--dim)}
+tr.done td{background:#86c43f0d}
+.cell-in{padding:4px 6px;width:80px}
+.box{display:inline-grid;place-items:center;width:20px;height:20px;border:2px solid var(--dim);border-radius:4px;font:800 13px/1 var(--f-body);color:#132006;vertical-align:middle}
+.box.b-ok{background:var(--nukage);border-color:var(--nukage)}
+.box.b-rt{border-color:var(--route);background:linear-gradient(135deg,var(--route) 50%,transparent 50%)}
+select.cell-in{width:auto}
+
+/* rich text */
+.rt-box{border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.rt-tools{display:flex;gap:2px;padding:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.rt-tools button{border:1px solid transparent;background:transparent;border-radius:4px;padding:3px 9px;cursor:pointer;color:var(--muted);font-size:14px}
+.rt-tools button:hover{color:var(--fg);border-color:var(--line)}
+.rt{padding:14px 16px;min-height:120px;max-width:72ch;outline:none;line-height:1.65}
+.rt:empty::before{content:attr(data-ph);color:var(--dim);font-style:italic}
+.rt p{margin:0 0 .8em}.rt ul,.rt ol{margin:.3em 0 .9em;padding-left:1.4em}
+.prose{max-width:72ch;line-height:1.65}
+.prose p{margin:0 0 .8em}.prose ul,.prose ol{padding-left:1.4em}
+.empty-note{color:var(--dim);font-style:italic}
+
+/* map page */
+.viewer{position:relative;aspect-ratio:16/9;max-width:100%;background:var(--panel-2) repeating-linear-gradient(45deg,#0000 0 10px,#ffffff05 10px 20px);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--dim);text-align:center}
+.viewer img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;cursor:zoom-in}
+.viewer .cap{position:absolute;left:12px;bottom:12px;z-index:2;font:600 12px/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;background:#000b;color:var(--fg);padding:6px 9px;border-radius:4px}
+.viewer .count-cap{left:auto;right:12px}
+.viewer .vnav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;border:0;background:#000a;color:var(--fg);width:42px;height:42px;border-radius:50%;cursor:pointer;font-size:18px}
+.viewer .vnav.l{left:12px}.viewer .vnav.r{right:12px}
+.viewer label{cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center;padding:20px}
+.strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(46%,150px),1fr));gap:10px;margin-top:10px}
+.thumb{position:relative;aspect-ratio:16/9;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel-2);cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px}
+.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.thumb.on{border-color:var(--brass)}
+.thumb .cap{position:absolute;left:4px;bottom:4px;font:600 10px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;background:#000b;color:var(--fg);padding:3px 5px;border-radius:3px}
+.thumb .x{position:absolute;top:3px;right:3px;background:#000b;color:var(--fg);border:0;border-radius:3px;cursor:pointer;padding:1px 6px;font-size:12px}
+.pager{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+.pager .btn{max-width:calc(50% - 6px);overflow:hidden;text-overflow:ellipsis}
+.mapname-big{font:700 clamp(34px,5.5vw,64px)/1.02 var(--f-display);margin-top:6px;overflow-wrap:anywhere}
+.grade-pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.ladder{display:flex;flex-wrap:wrap;gap:5px}
+.ladder button{border:1px solid var(--line);background:var(--bg);border-radius:5px;min-width:38px;padding:6px 4px;font:700 14px var(--f-display);cursor:pointer;color:var(--muted)}
+.ladder button:hover{border-color:var(--muted);color:var(--fg)}
+.ladder button.on{color:#130f0a;border-color:transparent}
+.ladder button:disabled{cursor:default;opacity:.55}
+.ladder button.on:disabled{opacity:1}
+
+/* forms / modal */
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px 16px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field>span{font:600 11px/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field.wide{grid-column:1/-1}
+.field input,.field select,.field textarea{width:100%}
+.check{display:flex;gap:8px;align-items:center;font-size:14px}
+dialog{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;padding:0;width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
+dialog::backdrop{background:#000b}
+dialog .dhead{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}
+dialog .dbody{padding:18px 20px;overflow:auto}
+dialog .dfoot{padding:14px 20px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.lightbox{width:min(1400px,calc(100vw - 24px));background:#000}
+.lightbox img{display:block;width:100%;height:auto;max-height:calc(100vh - 60px);object-fit:contain}
+
+/* about */
+.about-hero{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:32px;align-items:end;padding-bottom:28px;border-bottom:2px solid var(--line)}
+@media (max-width:820px){.about-hero{grid-template-columns:1fr}}
+.hud{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--panel);border:2px solid var(--line);border-radius:8px;overflow:hidden}
+.hud div{padding:12px 10px;border-right:2px solid var(--line);text-align:center;min-width:0}
+.hud div:last-child{border-right:0}
+.hud b{display:block;font:700 clamp(22px,3vw,34px)/1 var(--f-display);color:var(--blood);font-variant-numeric:tabular-nums}
+.hud span{font:600 10px/1.2 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+@media (max-width:480px){.hud{grid-template-columns:repeat(2,minmax(0,1fr))}.hud div:nth-child(2){border-right:0}.hud div:nth-child(-n+2){border-bottom:2px solid var(--line)}}
+.about-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:28px 36px;margin-top:32px}
+.lists{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:18px;margin-top:8px}
+.list{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.list h3{font:700 18px/1.2 var(--f-display);color:var(--brass);margin-bottom:6px}
+.list ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.list li{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #2b241c}
+.list li:last-child{border-bottom:0}
+.list .rk{font:700 20px/1 var(--f-display);color:var(--dim);text-align:right}
+.list li:nth-child(-n+3) .rk{color:var(--brass)}
+.list .lt{font-weight:600;line-height:1.25;overflow-wrap:anywhere}
+.list .lt a{text-decoration:none}.list .lt a:hover{color:var(--brass)}
+.list .ls{font-size:12.5px;color:var(--muted)}
+.list .ctl{display:flex;gap:0}
+.list .add{display:flex;gap:6px;margin-top:6px}
+.list .add input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:6px 8px;font-size:14px}
+.scale-table{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px}
+.scale{display:flex;flex-wrap:wrap;gap:6px}
+.scale span{display:inline-flex;flex-direction:column;align-items:center;gap:3px;font:500 12px var(--f-data);color:var(--muted)}
+
+.savestate{font:500 13px var(--f-data);color:var(--muted)}
+.savestate.err{color:var(--blood)}
+.notice{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;max-width:640px;display:flex;flex-direction:column;gap:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--brass);color:var(--brass-ink);font-weight:700;padding:9px 16px;border-radius:8px;z-index:50;box-shadow:0 6px 20px #000a}
+.loading{padding:80px 0;text-align:center;font:700 22px var(--f-display);color:var(--muted)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="logo" href="#about">WAD Ranker<small>&amp; Reviewer · Classic Doom</small></a>
+    <nav class="main" id="nav">
+      <a href="#about" data-nav="about">Home</a>
+      <a href="#wads" data-nav="wads">WAD Catalog</a>
+      <a href="#iwads" data-nav="iwads">IWADs</a>
+      <a href="#demos" data-nav="demos">Demo Tracker</a>
+    </nav>
+    <div class="tools">
+      <span class="savestate" id="saveState" aria-live="polite"></span>
+      <label class="switch" for="editToggle" id="editWrap"><input type="checkbox" id="editToggle"> Edit mode</label>
+      <button class="btn small ghost" id="dataBtn" type="button">Backup</button>
+      <button class="btn small ghost" id="loginBtn" type="button" hidden>Log in</button>
+    </div>
+  </div>
+</header>
+<main class="wrap" id="app"><div class="loading">Loading your catalog…</div></main>
+<dialog id="dlg"></dialog>
+<dialog id="lightbox" class="lightbox"></dialog>
+<input type="file" id="filePick" accept="image/*" hidden>
+
+<script>
+(() => {
+"use strict";
+/* ---------- grade scales ---------- */
+const Q_SCALE = [["S+",10],["S",9.5],["S-",9],["A+",8.5],["A",8],["A-",7.5],["B+",7],["B",6.5],["B-",6],["C+",5.5],["C",5],["C-",4.5],["D+",4],["D",3.5],["D-",3],["F",2.5]];
+const D_SCALE = [["X+",10],["X",9.5],["X-",9],["A+",8.5],["A",8],["A-",7.5],["B+",7],["B",6.5],["B-",6],["C+",5.5],["C",5],["C-",4.5],["D+",4],["D",3.5],["D-",3],["E+",2.5],["E",2],["E-",1.5]];
+const INDEX = [["Doomed",8000],["Legendary",2500],["Elite",800],["Jaded",300],["Veteran",100],["Marine",50],["Recruit",20],["Fairweather",10],["Beginner",5]];
+const INDEX_PTS = Object.fromEntries(INDEX);
+const COMP_ORDER = ["Vanilla","Limit-removing","Final Doom","Boom","MBF","MBF21","Eternity","Zdoom","UDMF"];
+const IWAD_LIST = ["Doom","Doom 2","TNT: Evilution","Plutonia"];
+const WAD_STATUS = ["Complete","Complete (SOLO WAD)","In Progress","Backlog","Not Being Looked At"];
+const MAP_DEMO = ["Incomplete","Routing & Practicing","Complete"];
+
+const letter = (n, scale) => {
+  if (n == null || n === "" || isNaN(n)) return null;
+  let best = scale[0], bd = Infinity;
+  for (const s of scale) { const d = Math.abs(s[1] - n); if (d < bd) { bd = d; best = s; } }
+  if (n < scale[scale.length - 1][1]) best = scale[scale.length - 1];
+  return best[0];
+};
+const gradeChip = (n, scale, lg) => {
+  const L = letter(n, scale);
+  if (!L) return `<span class="g none${lg ? " lg" : ""}">—</span>`;
+  return `<span class="g ${L[0]}${lg ? " lg" : ""}" title="${fmtN(n)} / 10">${L}</span>`;
+};
+const fmtN = n => n == null || n === "" || isNaN(n) ? "—" : (Math.round(n * 100) / 100).toString();
+const avg = arr => { const v = arr.filter(x => typeof x === "number" && !isNaN(x)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+
+/* ---------- utils ---------- */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const slugify = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "wad";
+const fmtTime = s => { if (s == null || s === "" || isNaN(s)) return ""; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2,"0")}:${String(x).padStart(2,"0")}` : `${m}:${String(x).padStart(2,"0")}`; };
+const parseTime = str => { str = String(str).trim(); if (!str) return null; const p = str.split(":").map(Number); if (p.some(isNaN)) return null; return p.reduce((a, b) => a * 60 + b, 0); };
+const fmtDate = iso => { if (!iso) return "—"; const d = new Date(iso + "T00:00:00"); return isNaN(d) ? iso : d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); };
+const year = iso => iso ? iso.slice(0, 4) : "—";
+const slotKey = s => { s = String(s || "").toUpperCase(); let m = s.match(/^E(\d+)M(\d+)/); if (m) return +m[1] * 100 + +m[2]; m = s.match(/(\d+)/); return m ? 10000 + +m[1] : 99999; };
+const hash = s => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const toast = msg => { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 1800); };
+
+const SAFE_TAGS = new Set(["B","STRONG","I","EM","U","UL","OL","LI","P","BR","DIV","A","H3","BLOCKQUOTE"]);
+function sanitize(html) {
+  const doc = new DOMParser().parseFromString(`<div>${html || ""}</div>`, "text/html");
+  const walk = node => {
+    for (const el of [...node.children]) {
+      walk(el);
+      if (!SAFE_TAGS.has(el.tagName)) { el.replaceWith(...el.childNodes); continue; }
+      for (const a of [...el.attributes]) if (!(el.tagName === "A" && a.name === "href" && /^https?:/i.test(a.value))) el.removeAttribute(a.name);
+      if (el.tagName === "A") { el.setAttribute("target", "_blank"); el.setAttribute("rel", "noopener"); }
+    }
+  };
+  walk(doc.body.firstChild);
+  return doc.body.firstChild.innerHTML.replace(/^(<br>|\s)+$/, "");
+}
+
+/* ---------- storage (IndexedDB, falls back to memory) ---------- */
+const DB = {
+  db: null,
+  open() { return new Promise(res => { try { const r = indexedDB.open("wad-ranker", 1); r.onupgradeneeded = () => r.result.createObjectStore("kv"); r.onsuccess = () => { this.db = r.result; res(); }; r.onerror = () => res(); } catch { res(); } }); },
+  get(k) { return new Promise(res => { try { const r = this.db.transaction("kv").objectStore("kv").get(k); r.onsuccess = () => res(r.result); r.onerror = () => res(null); } catch { res(null); } }); },
+  set(k, v) { return new Promise(res => { try { const t = this.db.transaction("kv", "readwrite"); t.objectStore("kv").put(v, k); t.oncomplete = () => res(true); t.onerror = () => res(false); } catch { res(false); } }); }
+};
+let S = null, saveTimer = null, persistOK = true;
+/* SERVER mode (live site on Vercel) saves to cloud storage; LOCAL mode (preview) saves in this browser */
+let SERVER = false, ADMIN = false, ME = {};
+const setSaveState = (t, err) => { const el = $("#saveState"); if (el) { el.textContent = t; el.classList.toggle("err", !!err); } };
+async function api(path, opts = {}) {
+  const r = await fetch(path, { credentials: "same-origin", ...opts, headers: { "Content-Type": "application/json", ...(opts.headers || {}) } });
+  let j = null; try { j = await r.json(); } catch {}
+  if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
+  return j;
+}
+const save = () => {
+  clearTimeout(saveTimer);
+  if (SERVER) {
+    if (!ADMIN) return;
+    setSaveState("Unsaved changes…");
+    saveTimer = setTimeout(async () => {
+      setSaveState("Saving…");
+      try { await api("/api/state", { method: "PUT", body: JSON.stringify(S) }); setSaveState("All changes saved"); }
+      catch (e) { setSaveState("Not saved: " + e.message, true); }
+    }, 1500);
+    return;
+  }
+  saveTimer = setTimeout(async () => { persistOK = await DB.set("state", S); if (!persistOK) toast("Couldn't save in this browser. Use Backup to keep your changes."); }, 300);
+};
+window.addEventListener("beforeunload", e => { if (SERVER && /Unsaved|Saving/.test($("#saveState")?.textContent || "")) { e.preventDefault(); e.returnValue = ""; } });
+async function storeImage(dataUrl, name) {
+  if (!SERVER || !dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
+  const j = await api("/api/upload", { method: "POST", body: JSON.stringify({ dataUrl, name }) });
+  return j.url;
+}
+const pref = { get(k, d) { try { const v = localStorage.getItem("wr-" + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem("wr-" + k, JSON.stringify(v)); } catch {} } };
+
+function buildFromSeed(seed) {
+  const wads = seed.wads.map(w => {
+    w.maps.forEach((m, i) => { m.id = (m.slot || "m").toLowerCase().replace(/[^a-z0-9]/g, "") + "-" + i; m.shots = m.shots || []; });
+    return w;
+  });
+  const st = { version: 1, about: { name: "Levi", tagline: "Classic Doom player, demo runner and WAD reviewer.", journey: "", play: "", record: "", review: "" }, lists: {}, wads };
+  // Seed top-10s from the spreadsheet grades so the page starts with real picks
+  const all = wads.flatMap(w => w.maps.map(m => ({ w, m })));
+  const wadQ = w => w.q ?? avg(w.maps.map(m => m.q)), wadD = w => w.d ?? avg(w.maps.map(m => m.d));
+  const topW = f => wads.filter(w => f(w) != null).sort((a, b) => f(b) - f(a)).slice(0, 10).map(w => ({ label: w.title, sub: w.authors, ref: `wad--${w.id}` }));
+  const topM = f => all.filter(x => x.m[f] != null).sort((a, b) => b.m[f] - a.m[f]).slice(0, 10).map(({ w, m }) => ({ label: m.name, sub: `${w.title} · ${m.slot}`, ref: `map--${w.id}--${m.id}` }));
+  const by = {}; all.forEach(({ m }) => { if (m.q != null && m.authors) (by[m.authors] ||= []).push(m.q); });
+  const mappers = Object.entries(by).filter(([, v]) => v.length >= 4).map(([k, v]) => [k, avg(v), v.length]).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, a, n]) => ({ label: k, sub: `Avg. quality ${a.toFixed(1)} over ${n} maps` }));
+  st.lists = {
+    favWads: { title: "Favorite WADs", items: topW(wadQ) },
+    favMaps: { title: "Favorite maps", items: topM("q") },
+    favMappers: { title: "Favorite mappers", items: mappers },
+    hardWads: { title: "Hardest WADs (for me)", items: topW(wadD) },
+    hardMaps: { title: "Hardest maps (for me)", items: topM("d") }
+  };
+  return st;
+}
+const wadById = id => S.wads.find(w => w.id === id);
+const sortedMaps = w => [...w.maps].sort((a, b) => slotKey(a.slot) - slotKey(b.slot));
+const demoDone = w => w.maps.filter(m => m.demo === "Complete").length;
+const wadComplete = w => w.maps.length > 0 && demoDone(w) === w.maps.length;
+
+/* ---------- placeholder titlepic ---------- */
+function picHTML(w, gradeHtml = "") {
+  if (w.titlepic) return `<div class="pic"><img src="${w.titlepic}" alt="${esc(w.title)} title screen" loading="lazy">${gradeHtml}</div>`;
+  const h = hash(w.title), hue = h % 360, hue2 = (hue + 30 + (h >> 9) % 60) % 360, ang = (h >> 4) % 180;
+  const bg = `background:linear-gradient(${ang}deg,hsl(${hue} 45% 22%),hsl(${hue2} 55% 12%) 70%),hsl(${hue} 30% 15%)`;
+  return `<div class="pic"><div class="ph" style="${bg}">${esc(w.title)}</div>${gradeHtml}</div>`;
+}
+
+/* ---------- edit mode ---------- */
+let EDIT = pref.get("edit", true);
+const editToggle = $("#editToggle"); editToggle.checked = EDIT;
+function applyAuthUI() {
+  if (SERVER) {
+    $("#editWrap").hidden = !ADMIN; $("#dataBtn").hidden = !ADMIN;
+    $("#loginBtn").hidden = false; $("#loginBtn").textContent = ADMIN ? "Log out" : "Log in";
+    if (!ADMIN) EDIT = false; else EDIT = editToggle.checked;
+  }
+}
+$("#loginBtn").addEventListener("click", async () => {
+  if (ADMIN) { try { await api("/api/login", { method: "DELETE" }); } catch {} ADMIN = false; applyAuthUI(); render(); toast("Logged out"); return; }
+  const d = $("#dlg"); d.onclose = null;
+  d.innerHTML = `<form id="lf"><div class="dhead"><h2>Log in</h2><button type="button" class="icon-btn" id="lfx" aria-label="Close">✕</button></div>
+    <div class="dbody stack"><label class="field"><span>Admin password</span><input type="password" id="lf-pw" autocomplete="current-password" required></label>
+    <p class="muted" id="lf-msg" style="margin:0;font-size:14px">${ME.passwordSet === false ? "No admin password is set yet. Add ADMIN_PASSWORD in the Vercel project settings and redeploy." : "Only you can edit. Visitors see the read-only site."}</p></div>
+    <div class="dfoot"><button class="btn primary" id="lf-go">Log in</button></div></form>`;
+  d.showModal(); $("#lf-pw").focus();
+  $("#lfx").onclick = () => d.close();
+  $("#lf").onsubmit = async e => { e.preventDefault(); $("#lf-go").disabled = true;
+    try { await api("/api/login", { method: "POST", body: JSON.stringify({ password: $("#lf-pw").value }) }); ADMIN = true; editToggle.checked = true; pref.set("edit", true); d.close(); applyAuthUI(); render(); toast("Logged in. Edit mode is on."); }
+    catch (err) { $("#lf-msg").textContent = err.message; $("#lf-msg").style.color = "var(--blood)"; $("#lf-go").disabled = false; } };
+});
+editToggle.addEventListener("change", () => { EDIT = editToggle.checked && (!SERVER || ADMIN); pref.set("edit", EDIT); render(); });
+
+/* ---------- rich text ---------- */
+function rich(id, html, ph) {
+  if (!EDIT) return html ? `<div class="prose">${sanitize(html)}</div>` : `<p class="empty-note">${esc(ph)}</p>`;
+  return `<div class="rt-box"><div class="rt-tools" role="toolbar">
+    <button type="button" data-cmd="bold" title="Bold"><b>B</b></button>
+    <button type="button" data-cmd="italic" title="Italic"><i>I</i></button>
+    <button type="button" data-cmd="insertUnorderedList" title="Bullet list">• List</button>
+    <button type="button" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+  </div><div class="rt" id="${id}" contenteditable="true" data-ph="${esc(ph)}">${sanitize(html)}</div></div>`;
+}
+function bindRich(root, id, setter) {
+  const el = $("#" + CSS.escape(id), root); if (!el) return;
+  const box = el.closest(".rt-box");
+  $$("[data-cmd]", box).forEach(b => b.addEventListener("mousedown", e => { e.preventDefault(); el.focus(); document.execCommand(b.dataset.cmd); setter(sanitize(el.innerHTML)); save(); }));
+  el.addEventListener("input", () => { setter(sanitize(el.innerHTML)); save(); });
+  el.addEventListener("paste", e => { e.preventDefault(); const t = e.clipboardData.getData("text/plain"); document.execCommand("insertText", false, t); });
+}
+
+/* ---------- images ---------- */
+function pickImage(maxW = 1600) {
+  return new Promise(res => {
+    const inp = $("#filePick"); inp.value = "";
+    inp.onchange = () => { const f = inp.files[0]; if (!f) return res(null); const rd = new FileReader();
+      rd.onload = () => { const img = new Image(); img.onload = () => { const sc = Math.min(1, maxW / img.width); const c = document.createElement("canvas"); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc); const x = c.getContext("2d"); x.imageSmoothingEnabled = sc < 1; x.drawImage(img, 0, 0, c.width, c.height); const du = c.toDataURL("image/jpeg", .86); if (!SERVER) return res(du); setSaveState("Uploading image…"); storeImage(du, f.name.replace(/\.[^.]+$/, "")).then(u => { setSaveState(""); res(u); }, err => { setSaveState("Upload failed: " + err.message, true); res(null); }); }; img.onerror = () => res(null); img.src = rd.result; };
+      rd.readAsDataURL(f); };
+    inp.click();
+  });
+}
+function lightbox(src) { const d = $("#lightbox"); d.innerHTML = `<img src="${src}" alt="">`; d.onclick = () => d.close(); d.showModal(); }
+
+/* ---------- router ---------- */
+function route() {
+  const h = decodeURIComponent(location.hash.replace(/^#/, "")) || "about";
+  const p = h.split("--");
+  return { name: p[0], a: p[1], b: p[2] };
+}
+function render() {
+  if (!S) return setupScreen();
+  const r = route(), app = $("#app");
+  const navKey = { wad: null, map: null, demo: "demos" }[r.name] ?? r.name;
+  let wadNav = null;
+  if (r.name === "wad" || r.name === "map") { const w = wadById(r.a); wadNav = w?.isIWAD ? "iwads" : "wads"; }
+  $$("#nav a").forEach(a => a.dataset.nav === (wadNav || navKey) ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
+  const views = { about: viewAbout, wads: () => viewCatalog(false), iwads: viewIwads, wad: () => viewWad(r.a), map: () => viewMap(r.a, r.b), demos: viewDemos, demo: () => viewDemoWad(r.a) };
+  (views[r.name] || viewAbout)(app);
+}
+let lastHash = location.hash;
+window.addEventListener("hashchange", () => { render(); if (location.hash !== lastHash) window.scrollTo(0, 0); lastHash = location.hash; });
+const rerender = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
+
+/* ---------- ABOUT ---------- */
+function viewAbout(app) {
+  const A = S.about;
+  const totalMaps = S.wads.reduce((a, w) => a + w.maps.length, 0);
+  const demoed = S.wads.reduce((a, w) => a + demoDone(w), 0);
+  const wadsDemoed = S.wads.filter(wadComplete).length;
+  const pts = S.wads.reduce((a, w) => a + w.maps.reduce((b, m) => b + (m.demo === "Complete" ? (INDEX_PTS[m.rank] || 0) : 0), 0), 0);
+  const allW = S.wads.map(w => w.title), allM = [...new Set(S.wads.flatMap(w => w.maps.map(m => m.authors)))];
+  app.innerHTML = `
+  <div class="about-hero">
+    <div class="stack">
+      <span class="eyebrow">About me</span>
+      ${EDIT ? `<input id="ab-name" class="mapname-big" style="background:transparent;border:1px dashed var(--line);border-radius:6px;padding:0 8px;width:100%" value="${esc(A.name)}" aria-label="Your name">
+        <input id="ab-tag" style="background:transparent;border:1px dashed var(--line);border-radius:6px;padding:6px 8px;font-size:18px;color:var(--muted);width:100%" value="${esc(A.tagline)}" aria-label="Tagline">`
+      : `<h1 class="mapname-big">${esc(A.name)}</h1><p class="muted" style="font-size:18px;margin:0">${esc(A.tagline)}</p>`}
+    </div>
+    <div class="hud" aria-label="Catalog totals">
+      <div><b>${S.wads.length}</b><span>WADs logged</span></div>
+      <div><b>${totalMaps.toLocaleString()}</b><span>Maps</span></div>
+      <div><b>${demoed.toLocaleString()}</b><span>Maps demoed</span></div>
+      <div><b>${wadsDemoed}</b><span>WADs fully demoed</span></div>
+    </div>
+  </div>
+  <div class="about-cols">
+    <section class="stack"><h2>My journey through Doom</h2>${rich("rt-journey", A.journey, "How you found Doom, the WADs that hooked you, and where you are now.")}</section>
+    <section class="stack"><h2>How I play</h2>${rich("rt-play", A.play, "Source port, settings, skill level, saves vs. pistol starts, and how you approach a new WAD.")}</section>
+    <section class="stack"><h2>How I record</h2>${rich("rt-record", A.record, "Demo recording setup (DSDA-Doom version, categories you run), video capture and live commentary.")}</section>
+    <section class="stack"><h2>How I review</h2>${rich("rt-review", A.review, "What you look for in a map, how you play maps for review, and how you assign grades.")}</section>
+  </div>
+  <section class="block">
+    <div class="row" style="justify-content:space-between"><h2>Top 10s</h2>${EDIT ? `<span class="muted" style="font-size:14px">Started from your spreadsheet grades. Add, remove and reorder freely.</span>` : ""}</div>
+    <datalist id="dl-wads">${allW.map(t => `<option value="${esc(t)}">`).join("")}</datalist>
+    <datalist id="dl-mappers">${allM.slice(0, 3000).map(t => `<option value="${esc(t)}">`).join("")}</datalist>
+    <div class="lists">${Object.entries(S.lists).map(([k, L]) => listHTML(k, L)).join("")}</div>
+  </section>
+  ${scaleExplainer()}
+  <section class="block"><h2>Doomed index points</h2>
+    <p class="muted" style="margin:0;max-width:72ch">Ranks on the DSDA Doomed index, with the points each completed demo is worth on the Demo Tracker. You've banked <b style="color:var(--fg)">${pts.toLocaleString()}</b> points across completed demos.</p>
+    <div class="scale">${INDEX.map(([n, p]) => `<span><span class="chip">${n}</span>${p.toLocaleString()}</span>`).join("")}</div>
+  </section>`;
+  if (EDIT) {
+    $("#ab-name").addEventListener("input", e => { A.name = e.target.value; save(); });
+    $("#ab-tag").addEventListener("input", e => { A.tagline = e.target.value; save(); });
+    ["journey", "play", "record", "review"].forEach(k => bindRich(app, "rt-" + k, v => A[k] = v));
+  }
+  app.querySelectorAll(".list").forEach(bindList);
+}
+function listHTML(k, L) {
+  const dl = /Wads$/.test(k) ? "dl-wads" : k === "favMappers" ? "dl-mappers" : "";
+  return `<div class="list" data-list="${k}">
+    <h3>${esc(L.title)}</h3>
+    ${L.items.length ? `<ol>${L.items.map((it, i) => `<li><span class="rk">${i + 1}</span>
+      <div style="min-width:0"><div class="lt">${it.ref ? `<a href="#${esc(it.ref)}">${esc(it.label)}</a>` : esc(it.label)}</div>${it.sub ? `<div class="ls">${esc(it.sub)}</div>` : ""}</div>
+      ${EDIT ? `<div class="ctl"><button class="icon-btn" data-act="up" data-i="${i}" aria-label="Move up" ${i ? "" : "disabled"}>▲</button><button class="icon-btn" data-act="down" data-i="${i}" aria-label="Move down" ${i < L.items.length - 1 ? "" : "disabled"}>▼</button><button class="icon-btn" data-act="del" data-i="${i}" aria-label="Remove">✕</button></div>` : "<span></span>"}</li>`).join("")}</ol>`
+      : `<p class="empty-note" style="margin:0">Nothing here yet.${EDIT ? " Add your first pick below." : ""}</p>`}
+    ${EDIT && L.items.length < 10 ? `<form class="add"><input name="v" ${dl ? `list="${dl}"` : ""} placeholder="Add (${10 - L.items.length} slots left)" aria-label="Add to ${esc(L.title)}"><button class="btn small primary">Add</button></form>` : ""}
+  </div>`;
+}
+function bindList(el) {
+  const L = S.lists[el.dataset.list];
+  el.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (!b) return; const i = +b.dataset.i;
+    if (b.dataset.act === "del") L.items.splice(i, 1);
+    if (b.dataset.act === "up" && i) [L.items[i - 1], L.items[i]] = [L.items[i], L.items[i - 1]];
+    if (b.dataset.act === "down" && i < L.items.length - 1) [L.items[i + 1], L.items[i]] = [L.items[i], L.items[i + 1]];
+    save(); rerender(); });
+  const f = $("form", el); if (!f) return;
+  f.addEventListener("submit", e => { e.preventDefault(); const v = f.v.value.trim(); if (!v) return;
+    const w = S.wads.find(x => x.title.toLowerCase() === v.toLowerCase());
+    let item = { label: v };
+    if (w && /Wads$/.test(el.dataset.list)) item = { label: w.title, sub: w.authors, ref: `wad--${w.id}` };
+    if (/Maps$/.test(el.dataset.list)) { for (const x of S.wads) { const m = x.maps.find(m => m.name.toLowerCase() === v.toLowerCase()); if (m) { item = { label: m.name, sub: `${x.title} · ${m.slot}`, ref: `map--${x.id}--${m.id}` }; break; } } }
+    L.items.push(item); save(); rerender(); });
+}
+function scaleExplainer() {
+  const row = sc => sc.map(([l, n]) => `<span><span class="g ${l[0]}">${l}</span>${n}</span>`).join("");
+  return `<section class="block"><h2>How the grades work</h2>
+  <p class="muted" style="margin:0;max-width:72ch">Every letter sits on the same 0–10 scale as the point columns in my spreadsheet, half a point per step. Map grades are stored as numbers, so a WAD's averages are plain means of its maps, then shown as the nearest letter.</p>
+  <div class="scale-table">
+    <div class="stack" style="gap:8px"><h3>Quality · S+ to F</h3><div class="scale">${row(Q_SCALE)}</div><span class="muted" style="font-size:13px">Anything under 2.75 is an F.</span></div>
+    <div class="stack" style="gap:8px"><h3>Difficulty · X+ to E−</h3><div class="scale">${row(D_SCALE)}</div><span class="muted" style="font-size:13px">X is beyond-A territory: slaughter and top-tier demo difficulty.</span></div>
+  </div></section>`;
+}
+
+/* ---------- WAD CATALOG ---------- */
+const SORTS = {
+  title: ["Name", (a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base", numeric: true })],
+  release: ["Release date", (a, b) => (a.release || "9999").localeCompare(b.release || "9999")],
+  comp: ["Comp. level", (a, b) => (COMP_ORDER.indexOf(a.comp) + 1 || 99) - (COMP_ORDER.indexOf(b.comp) + 1 || 99)],
+  mapper: ["Mapper", (a, b) => (a.authors || "~").localeCompare(b.authors || "~", undefined, { sensitivity: "base" })],
+  iwad: ["IWAD", (a, b) => (a.iwad || "~").localeCompare(b.iwad || "~")],
+  maps: ["Number of maps", (a, b) => a.maps.length - b.maps.length],
+  quality: ["Quality grade", (a, b) => (wadQ(b) ?? -1) - (wadQ(a) ?? -1)],
+  difficulty: ["Difficulty grade", (a, b) => (wadD(b) ?? -1) - (wadD(a) ?? -1)],
+};
+const wadQ = w => w.q ?? avg(w.maps.map(m => m.q));
+const wadD = w => w.d ?? avg(w.maps.map(m => m.d));
+function catalogControls(prefix, extraSorts = {}) {
+  const sorts = { ...SORTS, ...extraSorts };
+  const st = pref.get(prefix, { q: "", sort: "release", dir: 1, iwad: "", comp: "" });
+  return { st, sorts, html: `<div class="toolbar">
+    <input type="search" id="${prefix}-q" placeholder="Search title or mapper" value="${esc(st.q)}" aria-label="Search">
+    <select id="${prefix}-sort" aria-label="Sort by">${Object.entries(sorts).map(([k, [l]]) => `<option value="${k}" ${st.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select>
+    <button class="btn small" id="${prefix}-dir" type="button" aria-label="Flip sort order">${st.dir > 0 ? "↑ Asc" : "↓ Desc"}</button>
+    <select id="${prefix}-iwad" aria-label="Filter by IWAD"><option value="">All IWADs</option>${[...new Set(S.wads.map(w => w.iwad).filter(Boolean))].sort().map(i => `<option ${st.iwad === i ? "selected" : ""}>${esc(i)}</option>`).join("")}</select>
+    <select id="${prefix}-comp" aria-label="Filter by comp level"><option value="">All comp levels</option>${[...new Set(S.wads.map(w => w.comp).filter(Boolean))].sort((a, b) => (COMP_ORDER.indexOf(a) + 1 || 99) - (COMP_ORDER.indexOf(b) + 1 || 99)).map(i => `<option ${st.comp === i ? "selected" : ""}>${esc(i)}</option>`).join("")}</select>
+    ${extraSorts.__filter || ""}
+    <span class="count" id="${prefix}-count"></span>
+  </div>` };
+}
+function bindControls(prefix, st, redraw) {
+  const upd = () => { pref.set(prefix, st); redraw(); };
+  $(`#${prefix}-q`).addEventListener("input", e => { st.q = e.target.value; upd(); });
+  $(`#${prefix}-sort`).addEventListener("change", e => { st.sort = e.target.value; upd(); });
+  $(`#${prefix}-dir`).addEventListener("click", e => { st.dir *= -1; e.target.textContent = st.dir > 0 ? "↑ Asc" : "↓ Desc"; upd(); });
+  $(`#${prefix}-iwad`).addEventListener("change", e => { st.iwad = e.target.value; upd(); });
+  $(`#${prefix}-comp`).addEventListener("change", e => { st.comp = e.target.value; upd(); });
+}
+function filterSort(list, st, sorts) {
+  const q = st.q.trim().toLowerCase();
+  let out = list.filter(w => (!q || w.title.toLowerCase().includes(q) || (w.authors || "").toLowerCase().includes(q)) && (!st.iwad || w.iwad === st.iwad) && (!st.comp || w.comp === st.comp));
+  const f = (sorts[st.sort] || SORTS.release)[1];
+  return out.sort((a, b) => f(a, b) * st.dir || a.title.localeCompare(b.title));
+}
+function viewCatalog(_, app = $("#app")) {
+  const { st, sorts, html } = catalogControls("cat");
+  app.innerHTML = `<div class="row" style="justify-content:space-between"><div><span class="eyebrow">Reviews</span><h1>WAD Catalog</h1></div>
+    ${EDIT ? `<button class="btn primary" id="addWad" type="button">+ Add WAD</button>` : ""}</div>
+    ${html}<div class="grid" id="grid"></div>`;
+  const draw = () => {
+    const list = filterSort(S.wads.filter(w => !w.isIWAD), st, sorts);
+    $("#cat-count").textContent = `${list.length} WADs`;
+    $("#grid").innerHTML = list.map(w => `<a class="tile" href="#wad--${w.id}">
+      ${picHTML(w, `<span class="badge-grade">${wadQ(w) != null ? gradeChip(wadQ(w), Q_SCALE) : ""}</span>`)}
+      <div class="info"><span class="t">${esc(w.title)}</span><span class="a">${esc(w.authors || "Unknown mapper")}</span>
+      <span class="meta"><span>${year(w.release)}</span><span class="chip">${esc(w.comp || "?")}</span><span>${w.maps.length} maps</span></span></div></a>`).join("") || `<p class="empty-note">No WADs match these filters.</p>`;
+  };
+  bindControls("cat", st, draw); draw();
+  $("#addWad")?.addEventListener("click", () => wadForm(null));
+}
+function viewIwads(app) {
+  const list = S.wads.filter(w => w.isIWAD).sort((a, b) => (a.release || "").localeCompare(b.release || ""));
+  app.innerHTML = `<div class="row" style="justify-content:space-between"><div><span class="eyebrow">The official releases</span><h1>IWADs</h1></div>
+    ${EDIT ? `<button class="btn primary" id="addWad" type="button">+ Add IWAD</button>` : ""}</div>
+    <p class="muted" style="max-width:72ch">The commercial games get longer write-ups. Mark any WAD as an IWAD from its edit form to move it here.</p>
+    <div class="iwads">${list.map(w => {
+      const ex = w.review ? new DOMParser().parseFromString(sanitize(w.review), "text/html").body.textContent : "";
+      return `<a class="iwad" href="#wad--${w.id}">${picHTML(w)}<div class="stack" style="gap:8px;min-width:0">
+        <h3 style="font:700 22px/1.15 var(--f-display)">${esc(w.title)}</h3>
+        <span class="muted" style="font-size:14px">${esc(w.authors)} · ${year(w.release)} · ${w.maps.length} maps</span>
+        <div class="row" style="gap:8px">${gradeChip(wadQ(w), Q_SCALE)}${gradeChip(wadD(w), D_SCALE)}</div>
+        <span class="excerpt">${ex ? esc(ex) : "<i>No write-up yet.</i>"}</span></div></a>`; }).join("") || `<p class="empty-note">No IWADs yet.</p>`}</div>`;
+  $("#addWad")?.addEventListener("click", () => wadForm(null, true));
+}
+
+/* ---------- WAD form ---------- */
+function wadForm(w, iwadDefault = false) {
+  const isNew = !w;
+  w = w || { title: "", authors: "", release: "", iwad: "Doom 2", comp: "Boom", kills: null, items: null, secrets: null, casual: "Backlog", demo: "Not Being Looked At", isIWAD: iwadDefault, links: "", review: "", titlepic: "", maps: [], q: null, d: null, m: null };
+  const d = $("#dlg");
+  const opt = (arr, v) => arr.map(x => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
+  d.innerHTML = `<form method="dialog" id="wf"><div class="dhead"><h2>${isNew ? "Add WAD" : "Edit WAD"}</h2><button class="icon-btn" value="cancel" aria-label="Close">✕</button></div>
+  <div class="dbody"><div class="form">
+    <label class="field wide"><span>Title</span><input name="title" required value="${esc(w.title)}"></label>
+    <label class="field wide"><span>Mapper(s)</span><input name="authors" value="${esc(w.authors)}"></label>
+    <label class="field"><span>Release date</span><input type="date" name="release" value="${esc(w.release)}"></label>
+    <label class="field"><span>IWAD</span><select name="iwad">${opt(IWAD_LIST, w.iwad)}</select></label>
+    <label class="field"><span>Comp. level</span><select name="comp">${opt(COMP_ORDER, w.comp)}</select></label>
+    ${isNew ? `<label class="field"><span>Number of maps</span><input type="number" min="0" max="200" name="nmaps" value="32"></label>` : ""}
+    <label class="field"><span>Kills</span><input type="number" name="kills" value="${w.kills ?? ""}"></label>
+    <label class="field"><span>Items</span><input type="number" name="items" value="${w.items ?? ""}"></label>
+    <label class="field"><span>Secrets</span><input type="number" name="secrets" value="${w.secrets ?? ""}"></label>
+    <label class="field"><span>Casual status (UV-max w/ saves)</span><select name="casual">${opt(WAD_STATUS, w.casual)}</select></label>
+    <label class="field"><span>Demo status</span><select name="demo">${opt(WAD_STATUS, w.demo)}</select></label>
+    <label class="field wide"><span>Link (idgames, Doomworld thread…)</span><input type="url" name="links" value="${esc(w.links)}" placeholder="https://"></label>
+    <label class="check field wide"><input type="checkbox" name="isIWAD" ${w.isIWAD ? "checked" : ""}> Show in the IWADs section</label>
+  </div>${isNew ? `<p class="muted" style="font-size:13px">New WADs get empty MAP01–MAPxx rows (E1M1… for Doom) that you can fill in from the map pages.</p>` : ""}</div>
+  <div class="dfoot">${!isNew ? `<button type="button" class="btn danger" id="delWad" style="margin-right:auto">Delete WAD</button>` : ""}<button class="btn" value="cancel">Cancel</button><button class="btn primary" value="ok">${isNew ? "Add WAD" : "Save"}</button></div></form>`;
+  d.showModal();
+  $("#delWad")?.addEventListener("click", () => confirmBox(`Delete “${w.title}” and its ${w.maps.length} maps? This can't be undone (unless you have a backup).`, "Delete WAD", () => { S.wads.splice(S.wads.indexOf(w), 1); save(); location.hash = w.isIWAD ? "iwads" : "wads"; }));
+  d.onclose = () => {
+    if (d.returnValue !== "ok") return; const f = new FormData($("#wf")); const num = k => f.get(k) === "" ? null : +f.get(k);
+    Object.assign(w, { title: f.get("title").trim(), authors: f.get("authors").trim(), release: f.get("release"), iwad: f.get("iwad"), comp: f.get("comp"), kills: num("kills"), items: num("items"), secrets: num("secrets"), casual: f.get("casual"), demo: f.get("demo"), links: f.get("links").trim(), isIWAD: !!f.get("isIWAD") });
+    if (isNew) {
+      let id = slugify(w.title), n = 2; while (wadById(id)) id = slugify(w.title) + "-" + n++; w.id = id;
+      const nm = Math.max(0, Math.min(200, +f.get("nmaps") || 0));
+      for (let i = 1; i <= nm; i++) { const slot = w.iwad === "Doom" ? `E${Math.ceil(i / 9)}M${(i - 1) % 9 + 1}` : `MAP${String(i).padStart(2, "0")}`; w.maps.push(newMap(slot)); }
+      S.wads.push(w); save(); location.hash = `wad--${w.id}`; return;
+    }
+    save(); rerender();
+  };
+  d.returnValue = "";
+}
+let mapSeq = Date.now();
+const newMap = slot => ({ id: (slot || "m").toLowerCase().replace(/[^a-z0-9]/g, "") + "-n" + (mapSeq++).toString(36), slot, name: "", authors: "", midi: "", midiBy: "", q: null, d: null, m: null, kills: null, items: null, secrets: null, casual: "Incomplete", demo: "Incomplete", attempts: null, rank: "", uvTime: null, review: "", shots: [] });
+function confirmBox(msg, label, onYes) {
+  const d = $("#dlg"); if (d.open) d.close();
+  d.onclose = null;
+  d.innerHTML = `<form method="dialog"><div class="dhead"><h2>Are you sure?</h2></div><div class="dbody"><p style="margin:0">${esc(msg)}</p></div><div class="dfoot"><button class="btn" value="no">Cancel</button><button class="btn danger" value="yes">${esc(label)}</button></div></form>`;
+  d.returnValue = ""; d.showModal(); d.onclose = () => { if (d.returnValue === "yes") onYes(); };
+}
+
+/* ---------- WAD PAGE ---------- */
+function wadOrder(w, demo) {
+  if (demo) { const st = pref.get("demo", { q: "", sort: "release", dir: 1, iwad: "", comp: "" }); return filterSort([...S.wads], { ...st, q: "" }, { ...SORTS, progress: [0, (a, b) => demoDone(b) / (b.maps.length || 1) - demoDone(a) / (a.maps.length || 1)] }); }
+  if (w.isIWAD) return S.wads.filter(x => x.isIWAD).sort((a, b) => (a.release || "").localeCompare(b.release || ""));
+  const st = pref.get("cat", { q: "", sort: "release", dir: 1, iwad: "", comp: "" });
+  let list = filterSort(S.wads.filter(x => !x.isIWAD), st, SORTS);
+  if (!list.includes(w)) list = filterSort(S.wads.filter(x => !x.isIWAD), { q: "", sort: st.sort, dir: st.dir, iwad: "", comp: "" }, SORTS);
+  return list;
+}
+function wadPager(w, demo) {
+  const list = wadOrder(w, demo), i = list.indexOf(w);
+  return `<div style="margin-bottom:22px">${pagerHTML(list[i - 1], list[i + 1], x => `${demo ? "demo" : "wad"}--${x.id}`, x => x.title, "WAD")}</div>`;
+}
+function statusChip(s) { const c = /^Complete/.test(s) ? "ok" : /Progress|Routing/.test(s) ? "st-rt" : "no"; return s ? `<span class="st ${c}">${esc(s)}</span>` : "—"; }
+function gradeSelect(id, val, scale, label) {
+  const L = letter(val, scale);
+  return `<select id="${id}" aria-label="${esc(label)}"><option value="">Ungraded</option>${scale.map(([l, n]) => `<option value="${n}" ${L === l ? "selected" : ""}>${l} (${n})</option>`).join("")}</select>`;
+}
+function viewWad(id, app = $("#app")) {
+  const w = wadById(id); if (!w) { app.innerHTML = `<p>That WAD isn't in the catalog. <a href="#wads">Back to WADs</a></p>`; return; }
+  const maps = sortedMaps(w);
+  const aq = avg(maps.map(m => m.q)), ad = avg(maps.map(m => m.d)), am = avg(maps.map(m => m.m));
+  const rated = maps.filter(m => m.q != null).length;
+  const sum = k => w[k] ?? (maps.some(m => m[k] != null) ? maps.reduce((a, m) => a + (m[k] || 0), 0) : null);
+  const times = maps.map(m => m.uvTime).filter(Boolean);
+  app.innerHTML = `
+  <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs" : "WAD Catalog"}</a><span>/</span><span>${esc(w.title)}</span></div>
+  ${wadPager(w)}
+  <div class="hero">
+    <div class="stack" style="gap:10px">${picHTML(w)}
+      ${EDIT ? `<div class="row"><button class="btn small" id="setPic" type="button">${w.titlepic ? "Replace" : "Upload"} TITLEPIC</button>${w.titlepic ? `<button class="btn small danger" id="rmPic" type="button">Remove</button>` : ""}</div>` : ""}
+    </div>
+    <div style="min-width:0">
+      <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="stack" style="gap:6px;min-width:0">
+        <span class="eyebrow">${w.isIWAD ? "IWAD" : "PWAD"} · ${esc(w.iwad)}</span><h1>${esc(w.title)}</h1>
+        <span class="muted" style="font-size:17px">${esc(w.authors || "Unknown mapper")}</span></div>
+        ${EDIT ? `<button class="btn small" id="editWad" type="button">Edit details</button>` : ""}</div>
+      <div class="facts">
+        <div class="fact"><div class="k">Released</div><div class="v">${fmtDate(w.release)}</div></div>
+        <div class="fact"><div class="k">Comp. level</div><div class="v">${esc(w.comp || "—")}</div></div>
+        <div class="fact"><div class="k">Maps</div><div class="v">${maps.length}</div></div>
+        <div class="fact"><div class="k">Kills / Items / Secrets</div><div class="v">${[sum("kills"), sum("items"), sum("secrets")].map(x => x == null ? "—" : x.toLocaleString()).join(" / ")}</div></div>
+        <div class="fact"><div class="k">Casual (w/ saves)</div><div class="v">${statusChip(w.casual)}</div></div>
+        <div class="fact"><div class="k">Demos</div><div class="v">${statusChip(w.demo)} <a href="#demo--${w.id}" style="font-size:13px;color:var(--muted)">${demoDone(w)}/${maps.length}</a></div></div>
+        <div class="fact"><div class="k">Avg. UV-max time</div><div class="v">${times.length ? fmtTime(avg(times)) : "—"}</div></div>
+        ${w.links ? `<div class="fact"><div class="k">Link</div><div class="v"><a href="${esc(w.links)}" target="_blank" rel="noopener" style="color:var(--brass)">Open ↗</a></div></div>` : ""}
+      </div>
+      <div class="scores">
+        <div class="score"><span class="lbl">Overall quality</span><div class="line">${gradeChip(w.q, Q_SCALE, true)}${EDIT ? gradeSelect("wq", w.q, Q_SCALE, "Overall quality") : `<span class="gnum">${fmtN(w.q)}</span>`}</div>
+          <div class="avg">Map average ${gradeChip(aq, Q_SCALE)} <span class="gnum">${fmtN(aq)} · ${rated}/${maps.length} rated</span></div></div>
+        <div class="score"><span class="lbl">Overall difficulty</span><div class="line">${gradeChip(w.d, D_SCALE, true)}${EDIT ? gradeSelect("wd", w.d, D_SCALE, "Overall difficulty") : `<span class="gnum">${fmtN(w.d)}</span>`}</div>
+          <div class="avg">Map average ${gradeChip(ad, D_SCALE)} <span class="gnum">${fmtN(ad)}</span></div></div>
+        <div class="score"><span class="lbl">Music</span><div class="line">${gradeChip(w.m, Q_SCALE, true)}${EDIT ? gradeSelect("wm", w.m, Q_SCALE, "Overall music") : `<span class="gnum">${fmtN(w.m)}</span>`}</div>
+          <div class="avg">Map average ${gradeChip(am, Q_SCALE)} <span class="gnum">${fmtN(am)}</span></div></div>
+      </div>
+    </div>
+  </div>
+  <section class="block"><h2>${w.isIWAD ? "The write-up" : "Overview"}</h2>${rich("rt-wad", w.review, w.isIWAD ? "The long-form review of this IWAD." : "Your overall thoughts on this WAD.")}</section>
+  <section class="block"><div class="row" style="justify-content:space-between"><h2>Map list</h2>${EDIT ? `<button class="btn small primary" id="addMap" type="button">+ Add map</button>` : ""}</div>
+  <div class="tablewrap"><table class="maps"><thead><tr>
+    <th>Slot</th><th>Map name</th><th>Map author(s)</th><th>MIDI</th><th>MIDI author(s)</th><th>Quality</th><th>Difficulty</th><th>Music</th>
+    <th class="num">Kills</th><th class="num">Items</th><th class="num">Secrets</th><th>Casual max</th><th>Demo</th><th class="num">Attempts</th><th>Index rank</th><th class="num">Index pts</th><th class="num">UV-max time</th>${EDIT ? "<th></th>" : ""}
+  </tr></thead><tbody>${maps.map(m => `<tr class="${m.demo === "Complete" ? "done" : ""}">
+    <td><span class="slot">${esc(m.slot)}</span></td>
+    <td class="wrapcell"><a class="mapname" href="#map--${w.id}--${m.id}">${esc(m.name || "Untitled")}</a></td>
+    <td class="wrapcell">${esc(m.authors)}</td><td class="wrapcell">${esc(m.midi)}</td><td class="wrapcell">${esc(m.midiBy)}</td>
+    <td>${gradeChip(m.q, Q_SCALE)} <span class="gnum">${m.q ?? ""}</span></td>
+    <td>${gradeChip(m.d, D_SCALE)} <span class="gnum">${m.d ?? ""}</span></td>
+    <td><span class="gnum">${m.m ?? "—"}</span></td>
+    <td class="num">${m.kills ?? ""}</td><td class="num">${m.items ?? ""}</td><td class="num">${m.secrets ?? ""}</td>
+    <td>${statusChip(m.casual)}</td><td>${statusChip(m.demo)}</td><td class="num">${m.attempts ?? ""}</td>
+    <td>${esc(m.rank)}</td><td class="num">${m.rank && m.demo === "Complete" ? (INDEX_PTS[m.rank] || "") : ""}</td><td class="num">${fmtTime(m.uvTime)}</td>
+    ${EDIT ? `<td><button class="icon-btn" data-delmap="${m.id}" aria-label="Delete ${esc(m.name || m.slot)}">✕</button></td>` : ""}</tr>`).join("")}</tbody></table></div></section>`;
+  if (EDIT) {
+    bindRich(app, "rt-wad", v => w.review = v);
+    $("#editWad").onclick = () => wadForm(w);
+    $("#setPic").onclick = async () => { const src = await pickImage(960); if (src) { w.titlepic = src; save(); rerender(); } };
+    $("#rmPic")?.addEventListener("click", () => { w.titlepic = ""; save(); rerender(); });
+    [["wq", "q"], ["wd", "d"], ["wm", "m"]].forEach(([el, k]) => $("#" + el).addEventListener("change", e => { w[k] = e.target.value === "" ? null : +e.target.value; save(); rerender(); }));
+    $("#addMap").onclick = () => {
+      const last = maps[maps.length - 1]; let slot = "MAP01";
+      if (last) { const mm = last.slot.match(/^(E\d+M)(\d+)$/i) || last.slot.match(/^(MAP)(\d+)$/i); if (mm) slot = mm[1].toUpperCase() + String(+mm[2] + 1).padStart(mm[1].toUpperCase() === "MAP" ? 2 : 1, "0"); }
+      const m = newMap(slot); w.maps.push(m); save(); location.hash = `map--${w.id}--${m.id}`;
+    };
+    app.querySelectorAll("[data-delmap]").forEach(b => b.onclick = () => { const m = w.maps.find(x => x.id === b.dataset.delmap);
+      confirmBox(`Delete ${m.slot} “${m.name || "Untitled"}” from ${w.title}?`, "Delete map", () => { w.maps.splice(w.maps.indexOf(m), 1); save(); rerender(); }); });
+  }
+}
+
+/* ---------- MAP PAGE ---------- */
+const SHOT_CAPS = ["Spawn point", "Shot 2", "Shot 3", "Shot 4"];
+const capOf = i => SHOT_CAPS[i] || `Shot ${i + 1}`;
+let shotSel = { key: "", i: 0 };
+function pagerHTML(prev, next, hrefOf, labelOf, noun) {
+  return `<nav class="pager" aria-label="${noun} navigation">${prev ? `<a class="btn" href="#${hrefOf(prev)}" title="Previous ${noun}">← ${esc(labelOf(prev))}</a>` : "<span></span>"}${next ? `<a class="btn" href="#${hrefOf(next)}" title="Next ${noun}">${esc(labelOf(next))} →</a>` : "<span></span>"}</nav>`;
+}
+function viewMap(wid, mid, app = $("#app")) {
+  const w = wadById(wid), m = w?.maps.find(x => x.id === mid);
+  if (!m) { app.innerHTML = `<p>That map isn't in the catalog. <a href="#wads">Back to the catalog</a></p>`; return; }
+  const maps = sortedMaps(w), idx = maps.indexOf(m), prev = maps[idx - 1], next = maps[idx + 1];
+  const shots = [...m.shots]; while (shots.length < 4) shots.push(null);
+  if (shotSel.key !== w.id + m.id) shotSel = { key: w.id + m.id, i: 0 };
+  const filled = shots.map((x, i) => x ? i : -1).filter(i => i >= 0);
+  if (!EDIT && !shots[shotSel.i] && filled.length) shotSel.i = filled[0];
+  const cur = shotSel.i, src = shots[cur];
+  const fld = (k, label, type = "text", wide) => `<label class="field ${wide ? "wide" : ""}"><span>${label}</span><input data-f="${k}" type="${type === "tm" ? "text" : type}" value="${esc(type === "tm" ? fmtTime(m[k]) : m[k] ?? "")}" ${type === "tm" ? 'placeholder="m:ss" inputmode="numeric"' : ""}></label>`;
+  const sel = (k, label, arr) => `<label class="field"><span>${label}</span><select data-f="${k}"><option value=""></option>${arr.map(x => `<option ${m[k] === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></label>`;
+  const fact = (l, v) => `<div class="fact"><div class="k">${l}</div><div class="v">${v || "—"}</div></div>`;
+  const ladder = (k, scale, title) => `<div class="score"><span class="lbl">${title}</span>
+    <div class="line">${gradeChip(m[k], scale, true)}<span class="gnum">${m[k] != null ? fmtN(m[k]) + " / 10" : "Ungraded"}</span></div>
+    <div class="ladder" role="group" aria-label="${title}">${scale.map(([l, n]) => `<button type="button" data-grade="${k}" data-v="${n}" class="${letter(m[k], scale) === l ? "on g " + l[0] : ""}" ${EDIT ? "" : "disabled"}>${l}</button>`).join("")}
+    ${EDIT && m[k] != null ? `<button type="button" data-grade="${k}" data-v="" title="Clear grade">✕</button>` : ""}</div></div>`;
+  const stripIdx = EDIT ? shots.map((_, i) => i) : filled;
+  app.innerHTML = `
+  <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs" : "WAD Catalog"}</a><span>/</span><a href="#wad--${w.id}">${esc(w.title)}</a><span>/</span><span>${esc(m.slot)}</span></div>
+  <section class="stack" style="gap:10px">
+    <div><span class="slot" style="font-size:18px">${esc(m.slot)}</span> <span class="muted">· ${esc(w.title)}</span></div>
+    ${EDIT ? `<input class="mapname-big" data-f="name" value="${esc(m.name)}" placeholder="Map name" aria-label="Map name" style="background:transparent;border:1px dashed var(--line);border-radius:6px;padding:0 8px;width:100%">` : `<h1 class="mapname-big">${esc(m.name || "Untitled")}</h1>`}
+    ${EDIT ? `<div class="form" style="margin-top:6px">${fld("slot", "Map slot")}${fld("authors", "Map author(s)")}${fld("midi", "MIDI name")}${fld("midiBy", "MIDI author(s)")}
+      ${fld("kills", "Kills", "number")}${fld("items", "Items", "number")}${fld("secrets", "Secrets", "number")}
+      ${sel("casual", "Casual max? (w/ saves)", ["Complete", "Incomplete"])}${sel("demo", "Demo status", MAP_DEMO)}${fld("attempts", "Demo attempts", "number")}
+      ${sel("rank", "Index rank", INDEX.map(x => x[0]))}${fld("uvTime", "UV-max time", "tm")}</div>`
+    : `<div class="facts">${fact("Map author(s)", esc(m.authors))}${fact("MIDI", esc(m.midi))}${fact("MIDI author(s)", esc(m.midiBy))}
+      ${fact("Kills / Items / Secrets", [m.kills, m.items, m.secrets].map(x => x ?? "—").join(" / "))}${fact("Quality / Difficulty", `${gradeChip(m.q, Q_SCALE)} ${gradeChip(m.d, D_SCALE)}`)}${fact("Casual max", statusChip(m.casual))}${fact("Demo", statusChip(m.demo))}
+      ${fact("Demo attempts", m.attempts)}${fact("Index rank", esc(m.rank) + (m.rank ? ` <span class="muted">(${INDEX_PTS[m.rank]} pts)</span>` : ""))}${fact("UV-max time", fmtTime(m.uvTime))}</div>`}
+  </section>
+  <div style="margin-top:28px">${pagerHTML(prev, next, x => `map--${w.id}--${x.id}`, x => `${x.slot} ${x.name}`.trim(), "map")}</div>
+  <section class="block" style="margin-top:18px" aria-label="Photo gallery">
+    <div class="viewer">${src ? `<img src="${src}" alt="${esc(m.name)}: ${capOf(cur)}" id="viewerImg">` : EDIT ? `<label data-addshot="${cur}"><b style="color:var(--fg);font-size:28px">+</b>Add ${capOf(cur).toLowerCase()} (1920×1080 works best)</label>` : `<span>No screenshots yet</span>`}
+      <span class="cap">${capOf(cur)}</span>${filled.length > 1 ? `<span class="cap count-cap">${filled.indexOf(cur) + 1} / ${filled.length}</span><button class="vnav l" data-step="-1" aria-label="Previous shot">‹</button><button class="vnav r" data-step="1" aria-label="Next shot">›</button>` : ""}</div>
+    ${stripIdx.length > 1 || EDIT ? `<div class="strip">${stripIdx.map(i => `<button type="button" class="thumb ${i === cur ? "on" : ""}" data-pick="${i}" aria-label="Show ${capOf(i)}">${shots[i] ? `<img src="${shots[i]}" alt="" loading="lazy">` : "+ Add"}<span class="cap">${capOf(i)}</span>${EDIT && shots[i] ? `<span class="x" data-rmshot="${i}" role="button" aria-label="Remove ${capOf(i)}">✕</span>` : ""}</button>`).join("")}
+      ${EDIT ? `<button type="button" class="thumb" data-addshot="${shots.length}" aria-label="Add another screenshot">+ Another shot</button>` : ""}</div>` : ""}
+  </section>
+  <section class="block"><h2>Review</h2>${rich("rt-map", m.review, "No review yet.")}</section>
+  <section class="block"><h2>Grades</h2><div class="grade-pick">${ladder("q", Q_SCALE, "Quality")}${ladder("d", D_SCALE, "Difficulty")}${ladder("m", Q_SCALE, "Music")}</div></section>
+  <div style="margin-top:40px">${pagerHTML(prev, next, x => `map--${w.id}--${x.id}`, x => `${x.slot} ${x.name}`.trim(), "map")}</div>`;
+  async function addShot(i) { const url = await pickImage(1920); if (!url) return; while (m.shots.length < i) m.shots.push(null); m.shots[i] = url; shotSel.i = i; save(); rerender(); }
+  $("#viewerImg")?.addEventListener("click", e => lightbox(e.target.src));
+  app.querySelectorAll("[data-step]").forEach(b => b.onclick = () => { const k = filled.indexOf(cur); shotSel.i = filled[(k + +b.dataset.step + filled.length) % filled.length]; rerender(); });
+  app.querySelectorAll("[data-pick]").forEach(b => b.onclick = e => { if (e.target.closest("[data-rmshot]")) return; const i = +b.dataset.pick; if (!shots[i] && EDIT) return addShot(i); shotSel.i = i; rerender(); });
+  if (!EDIT) return;
+  bindRich(app, "rt-map", v => m.review = v);
+  app.querySelectorAll("[data-f]").forEach(inp => inp.addEventListener("change", () => {
+    const k = inp.dataset.f, v = inp.value;
+    m[k] = inp.type === "number" ? (v === "" ? null : +v) : k === "uvTime" ? parseTime(v) : v;
+    if (k === "uvTime") inp.value = fmtTime(m[k]);
+    save();
+  }));
+  app.querySelectorAll("[data-grade]").forEach(b => b.onclick = () => { m[b.dataset.grade] = b.dataset.v === "" ? null : +b.dataset.v; save(); rerender(); });
+  app.querySelectorAll("label[data-addshot],button[data-addshot]").forEach(l => l.onclick = () => addShot(+l.dataset.addshot));
+  app.querySelectorAll("[data-rmshot]").forEach(b => b.onclick = e => { e.stopPropagation(); m.shots[+b.dataset.rmshot] = null; while (m.shots.length && !m.shots[m.shots.length - 1]) m.shots.pop(); save(); rerender(); });
+}
+
+/* ---------- DEMO TRACKER ---------- */
+function viewDemos(app) {
+  const extra = { progress: ["Demo progress", (a, b) => demoDone(b) / (b.maps.length || 1) - demoDone(a) / (a.maps.length || 1)] };
+  const { st, sorts, html } = catalogControls("demo", extra);
+  st.show ||= "all";
+  const totalPts = S.wads.reduce((a, w) => a + w.maps.reduce((b, m) => b + (m.demo === "Complete" ? (INDEX_PTS[m.rank] || 0) : 0), 0), 0);
+  app.innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-end"><div><span class="eyebrow">DSDA-Doom UV-max</span><h1>Demo Tracker</h1></div>
+    <div class="hud" style="min-width:min(100%,460px)"><div><b>${S.wads.filter(wadComplete).length}</b><span>WADs done</span></div><div><b>${S.wads.reduce((a, w) => a + demoDone(w), 0).toLocaleString()}</b><span>Maps done</span></div><div><b>${S.wads.reduce((a, w) => a + w.maps.filter(m => m.demo === "Routing & Practicing").length, 0)}</b><span>Routing</span></div><div><b>${totalPts.toLocaleString()}</b><span>Index pts</span></div></div></div>
+    ${html.replace('<span class="count"', `<select id="demo-show" aria-label="Show"><option value="all">All WADs</option><option value="started" ${st.show === "started" ? "selected" : ""}>Started</option><option value="done" ${st.show === "done" ? "selected" : ""}>Fully demoed</option><option value="todo" ${st.show === "todo" ? "selected" : ""}>Not finished</option></select><span class="count"`)}
+    <div class="grid" id="grid"></div>`;
+  const draw = () => {
+    let list = filterSort([...S.wads], st, sorts);
+    if (st.show === "started") list = list.filter(w => demoDone(w) || w.maps.some(m => m.demo === "Routing & Practicing"));
+    if (st.show === "done") list = list.filter(wadComplete);
+    if (st.show === "todo") list = list.filter(w => !wadComplete(w));
+    $("#demo-count").textContent = `${list.length} WADs`;
+    $("#grid").innerHTML = list.map(w => { const n = demoDone(w), t = w.maps.length, pct = t ? n / t * 100 : 0, done = wadComplete(w);
+      return `<a class="tile ${done ? "done" : ""}" href="#demo--${w.id}">${picHTML(w, done ? `<span class="badge-grade chip" style="background:var(--nukage);color:#132006;border:0">100%</span>` : "")}
+      <div class="info"><span class="t">${esc(w.title)}</span><span class="a">${esc(w.authors)}</span></div>
+      <div class="stack" style="gap:4px"><div class="progress ${done ? "" : "part"}" role="progressbar" aria-valuenow="${n}" aria-valuemin="0" aria-valuemax="${t}" aria-label="Demos completed"><i style="width:${pct}%"></i></div>
+      <div class="prog-label"><span>${n}/${t} maps</span><span>${Math.round(pct)}%</span></div></div></a>`; }).join("") || `<p class="empty-note">No WADs match these filters.</p>`;
+  };
+  bindControls("demo", st, draw);
+  $("#demo-show").addEventListener("change", e => { st.show = e.target.value; pref.set("demo", st); draw(); });
+  draw();
+}
+function viewDemoWad(id, app = $("#app")) {
+  const w = wadById(id); if (!w) { app.innerHTML = `<p>That WAD isn't in the catalog. <a href="#demos">Back to the tracker</a></p>`; return; }
+  const maps = sortedMaps(w), n = demoDone(w), t = maps.length, done = wadComplete(w);
+  const att = maps.reduce((a, m) => a + (m.attempts || 0), 0);
+  const tsum = maps.filter(m => m.demo === "Complete" && m.uvTime).reduce((a, m) => a + m.uvTime, 0);
+  const pts = maps.reduce((a, m) => a + (m.demo === "Complete" ? (INDEX_PTS[m.rank] || 0) : 0), 0);
+  const box = s => `<span class="box ${s === "Complete" ? "b-ok" : s === "Routing & Practicing" ? "b-rt" : ""}">${s === "Complete" ? "✓" : ""}</span>`;
+  app.innerHTML = `
+  <div class="crumbs"><a href="#demos">Demo Tracker</a><span>/</span><span>${esc(w.title)}</span></div>
+  ${wadPager(w, true)}
+  <div class="hero" style="grid-template-columns:minmax(0,300px) minmax(0,1fr)">
+    ${picHTML(w)}
+    <div class="stack" style="gap:10px;min-width:0">
+      <span class="eyebrow">${esc(w.iwad)} · ${esc(w.comp)}</span><h1 style="${done ? "color:var(--nukage)" : ""}">${esc(w.title)}</h1>
+      <span class="muted">${esc(w.authors)} · <a href="#wad--${w.id}" style="color:var(--brass)">Review page</a></span>
+      <div class="stack" style="gap:6px;max-width:520px"><div class="progress ${done ? "" : "part"}" style="height:12px"><i style="width:${t ? n / t * 100 : 0}%"></i></div>
+        <div class="prog-label" style="font-size:14px"><span>${n} of ${t} maps demoed${done ? " · WAD complete" : ""}</span><span>${t ? Math.round(n / t * 100) : 0}%</span></div></div>
+      <div class="facts"><div class="fact"><div class="k">Total attempts</div><div class="v">${att.toLocaleString()}</div></div>
+        <div class="fact"><div class="k">Combined UV-max time</div><div class="v">${fmtTime(tsum) || "—"}</div></div>
+        <div class="fact"><div class="k">Index points</div><div class="v">${pts.toLocaleString()}</div></div>
+        <div class="fact"><div class="k">Routing now</div><div class="v">${maps.filter(m => m.demo === "Routing & Practicing").length}</div></div></div>
+      ${EDIT ? `<p class="muted" style="font-size:13px;margin:0">Click a box to cycle: ${box("")} not done, ${box("Routing & Practicing")} routing &amp; practicing, ${box("Complete")} demo complete.</p>` : ""}
+    </div>
+  </div>
+  <section class="block"><div class="tablewrap"><table class="maps"><thead><tr><th>Demo</th><th>Slot</th><th>Map</th><th class="num">Attempts</th><th>UV-max time</th><th>Doomed index rank</th><th class="num">Pts</th></tr></thead>
+  <tbody>${maps.map(m => `<tr class="${m.demo === "Complete" ? "done" : ""}">
+    <td>${EDIT ? `<button class="icon-btn" data-cycle="${m.id}" aria-label="${esc(m.demo || "Incomplete")}, click to change">${box(m.demo)}</button>` : box(m.demo)}</td>
+    <td><span class="slot">${esc(m.slot)}</span></td><td class="wrapcell"><a class="mapname" href="#map--${w.id}--${m.id}">${esc(m.name || "Untitled")}</a></td>
+    <td class="num">${EDIT ? `<input class="cell-in" type="number" min="0" data-df="attempts" data-id="${m.id}" value="${m.attempts ?? ""}" aria-label="Attempts">` : (m.attempts ?? "")}</td>
+    <td>${EDIT ? `<input class="cell-in" data-df="uvTime" data-id="${m.id}" value="${fmtTime(m.uvTime)}" placeholder="m:ss" aria-label="UV-max time">` : fmtTime(m.uvTime)}</td>
+    <td>${EDIT ? `<select class="cell-in" data-df="rank" data-id="${m.id}" aria-label="Index rank"><option value="">—</option>${INDEX.map(([r]) => `<option ${m.rank === r ? "selected" : ""}>${r}</option>`).join("")}</select>` : esc(m.rank)}</td>
+    <td class="num">${m.rank ? `<span style="${m.demo === "Complete" ? "" : "color:var(--dim)"}">${INDEX_PTS[m.rank]}</span>` : ""}</td></tr>`).join("")}</tbody></table></div></section>`;
+  if (!EDIT) return;
+  app.querySelectorAll("[data-cycle]").forEach(b => b.onclick = () => { const m = w.maps.find(x => x.id === b.dataset.cycle); m.demo = MAP_DEMO[(MAP_DEMO.indexOf(m.demo) + 1) % 3]; syncWadDemo(w); save(); rerender(); });
+  app.querySelectorAll("[data-df]").forEach(inp => inp.addEventListener("change", () => { const m = w.maps.find(x => x.id === inp.dataset.id), k = inp.dataset.df;
+    m[k] = k === "attempts" ? (inp.value === "" ? null : +inp.value) : k === "uvTime" ? parseTime(inp.value) : inp.value;
+    save(); if (k === "rank") rerender(); else if (k === "uvTime") inp.value = fmtTime(m.uvTime); }));
+}
+function syncWadDemo(w) {
+  if (wadComplete(w)) w.demo = w.maps.length === 1 ? "Complete (SOLO WAD)" : "Complete";
+  else if (/^Complete/.test(w.demo)) w.demo = "In Progress";
+  else if (w.demo !== "In Progress" && w.maps.some(m => m.demo !== "Incomplete")) w.demo = "In Progress";
+}
+
+/* ---------- backup ---------- */
+$("#dataBtn").addEventListener("click", () => {
+  const d = $("#dlg"); d.onclose = null;
+  d.innerHTML = `<form method="dialog"><div class="dhead"><h2>Backup &amp; restore</h2><button class="icon-btn" value="x" aria-label="Close">✕</button></div>
+  <div class="dbody stack"><p style="margin:0">Everything you add is saved in this browser. Download a backup file now and then, especially before clearing site data, and use it to move your catalog to another device or to the live site.</p>
+  <div class="row"><button type="button" class="btn primary" id="bk-dl">Download backup (.json)</button><button type="button" class="btn" id="bk-copy">Copy backup text</button>
+  <label class="btn" for="bk-file">Restore from file…</label><input type="file" id="bk-file" accept="application/json,.json" hidden></div>
+  <p class="muted" style="font-size:13px;margin:0" id="bk-msg">${persistOK ? "Saving in this browser is working." : "Saving in this browser is blocked here, so download a backup before closing the page."}</p>
+  <hr style="border:0;border-top:1px solid var(--line);width:100%">
+  <div class="row"><button type="button" class="btn danger" id="bk-reset">Reset to spreadsheet data</button><span class="muted" style="font-size:13px">Replaces everything with the original Doom_Catalog import.</span></div></div></form>`;
+  d.showModal();
+  const json = () => JSON.stringify(S);
+  $("#bk-dl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([json()], { type: "application/json" })); a.download = `wad-ranker-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); $("#bk-msg").textContent = "If no file appeared, this preview blocks downloads. Use Copy backup text instead."; };
+  $("#bk-copy").onclick = () => navigator.clipboard.writeText(json()).then(() => $("#bk-msg").textContent = "Backup copied. Paste it into a .json file to keep it.", () => $("#bk-msg").textContent = "Copy was blocked here. Try Download instead.");
+  $("#bk-file").onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(async t => { let o; try { o = JSON.parse(t); if (!Array.isArray(o.wads)) throw 0; } catch { $("#bk-msg").textContent = "That file isn't a WAD Ranker backup or seed file."; return; }
+    if (!o.about) o = buildFromSeed(o);
+    if (SERVER) { const jobs = []; o.wads.forEach(w => { if (w.titlepic?.startsWith("data:")) jobs.push([w, "titlepic", w.id]); w.maps.forEach(m => (m.shots || []).forEach((sh, i) => { if (sh?.startsWith("data:")) jobs.push([m.shots, i, w.id + "-" + m.slot]); })); });
+      for (let i = 0; i < jobs.length; i++) { $("#bk-msg").textContent = `Uploading images ${i + 1} of ${jobs.length}…`; const [obj, k, n] = jobs[i]; try { obj[k] = await storeImage(obj[k], n); } catch (e) { $("#bk-msg").textContent = "Image upload failed: " + e.message; return; } } }
+    S = o; save(); d.close(); render(); toast(`Loaded ${S.wads.length} WADs`); }); };
+  $("#bk-reset").onclick = () => confirmBox("Replace everything (reviews, screenshots, list edits) with the original spreadsheet import?", "Reset", async () => { try { S = buildFromSeed(await loadSeed()); } catch { toast("Use Restore and pick seed.json instead"); return; } save(); render(); toast("Reset to spreadsheet data"); });
+});
+
+async function loadSeed() { const r = await fetch("seed.json"); if (!r.ok) throw new Error("no seed"); return r.json(); }
+function setupScreen() {
+  $("#app").innerHTML = ADMIN ? `<div class="notice"><h2>Load your catalog</h2>
+    <p style="margin:0">The live site has no data yet. Choose <b>seed.json</b> (your spreadsheet import) or a backup file from the preview, and it will be saved to the site's storage.</p>
+    <div class="row"><label class="btn primary" for="setup-file">Choose file…</label><input type="file" id="setup-file" accept=".json,application/json" hidden><button class="btn" id="setup-empty" type="button">Start with an empty catalog</button></div>
+    <p class="muted" id="setup-msg" style="margin:0;font-size:14px"></p></div>`
+  : `<div class="notice"><h2>Coming soon</h2><p style="margin:0">The catalog is being set up. Check back shortly.</p></div>`;
+  if (!ADMIN) return;
+  $("#setup-empty").onclick = () => { S = buildFromSeed({ wads: [] }); save(); render(); };
+  $("#setup-file").onchange = e => { const f = e.target.files[0]; if (!f) return; $("#setup-msg").textContent = "Reading…";
+    f.text().then(t => { try { let o = JSON.parse(t); if (!Array.isArray(o.wads)) throw 0; if (!o.about) o = buildFromSeed(o); S = o; save(); render(); toast(`Loaded ${S.wads.length} WADs. Saving…`); } catch { $("#setup-msg").textContent = "That file isn't a WAD Ranker backup or seed file."; } }); };
+}
+(async () => {
+  try { const r = await fetch("/api/me", { credentials: "same-origin" }); if (r.ok) { ME = await r.json(); SERVER = !!ME.server; ADMIN = !!ME.admin; } } catch {}
+  applyAuthUI();
+  if (SERVER) {
+    try { S = await api("/api/state"); } catch (e) { $("#app").innerHTML = `<div class="notice"><h2>Couldn't load the catalog</h2><p style="margin:0">${esc(e.message)}</p></div>`; return; }
+    if (!S) { try { S = buildFromSeed(await loadSeed()); if (ADMIN) save(); } catch { return setupScreen(); } }
+    render(); return;
+  }
+  await DB.open();
+  S = await DB.get("state");
+  if (!S) { try { S = buildFromSeed(await loadSeed()); save(); } catch (e) { $("#app").innerHTML = `<p class="loading">Couldn't load the catalog data (seed.json).</p>`; return; } }
+  render();
+})();
+})();
+</script>
+</body></html>
