@@ -421,7 +421,7 @@ $("#loginBtn").addEventListener("click", async () => {
   d.showModal(); $("#lf-pw").focus();
   $("#lfx").onclick = () => d.close();
   $("#lf").onsubmit = async e => { e.preventDefault(); $("#lf-go").disabled = true;
-    try { await api("/api/login", { method: "POST", body: JSON.stringify({ password: $("#lf-pw").value }) }); ADMIN = true; editToggle.checked = true; pref.set("edit", true); d.close(); applyAuthUI(); render(); toast("Logged in. Edit mode is on."); }
+    try { await api("/api/login", { method: "POST", body: JSON.stringify({ password: $("#lf-pw").value }) }); ADMIN = true; editToggle.checked = true; pref.set("edit", true); d.close(); if (!S) { location.reload(); return; } applyAuthUI(); render(); toast("Logged in. Edit mode is on."); }
     catch (err) { $("#lf-msg").textContent = err.message; $("#lf-msg").style.color = "var(--blood)"; $("#lf-go").disabled = false; } };
 });
 editToggle.addEventListener("change", () => { EDIT = editToggle.checked && (!SERVER || ADMIN); pref.set("edit", EDIT); render(); });
@@ -926,10 +926,11 @@ async function loadSeed() { const r = await fetch("seed.json"); if (!r.ok) throw
 function setupScreen() {
   $("#app").innerHTML = ADMIN ? `<div class="notice"><h2>Load your catalog</h2>
     <p style="margin:0">The live site has no data yet. Choose <b>seed.json</b> (your spreadsheet import) or a backup file from the preview, and it will be saved to the site's storage.</p>
-    <div class="row"><label class="btn primary" for="setup-file">Choose file…</label><input type="file" id="setup-file" accept=".json,application/json" hidden><button class="btn" id="setup-empty" type="button">Start with an empty catalog</button></div>
+    <div class="row"><button class="btn primary" id="setup-seed" type="button">Load my spreadsheet data</button><label class="btn" for="setup-file">Choose file…</label><input type="file" id="setup-file" accept=".json,application/json" hidden><button class="btn" id="setup-empty" type="button">Start with an empty catalog</button></div>
     <p class="muted" id="setup-msg" style="margin:0;font-size:14px"></p></div>`
   : `<div class="notice"><h2>Coming soon</h2><p style="margin:0">The catalog is being set up. Check back shortly.</p></div>`;
   if (!ADMIN) return;
+  $("#setup-seed").onclick = async () => { $("#setup-msg").textContent = "Loading…"; try { S = buildFromSeed(await loadSeed()); save(); render(); toast(`Loaded ${S.wads.length} WADs. Saving…`); } catch { $("#setup-msg").textContent = "Couldn't load seed.json. Choose the file instead."; } };
   $("#setup-empty").onclick = () => { S = buildFromSeed({ wads: [] }); save(); render(); };
   $("#setup-file").onchange = e => { const f = e.target.files[0]; if (!f) return; $("#setup-msg").textContent = "Reading…";
     f.text().then(t => { try { let o = JSON.parse(t); if (!Array.isArray(o.wads)) throw 0; if (!o.about) o = buildFromSeed(o); S = o; save(); render(); toast(`Loaded ${S.wads.length} WADs. Saving…`); } catch { $("#setup-msg").textContent = "That file isn't a WAD Ranker backup or seed file."; } }); };
