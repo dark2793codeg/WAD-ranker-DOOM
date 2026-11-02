@@ -392,7 +392,8 @@ function buildFromSeed(seed) {
     favMaps: { title: "Favorite maps", items: topM("q") },
     favMappers: { title: "Favorite mappers", items: mappers },
     hardWads: { title: "Hardest WADs (for me)", items: topW(wadD) },
-    hardMaps: { title: "Hardest maps (for me)", items: topM("d") }
+    hardMaps: { title: "Hardest maps (general)", items: topM("d") },
+    hardMapsSaveless: { title: "Hardest maps (saveless)", items: [] }
   };
   return st;
 }
@@ -470,8 +471,19 @@ function route() {
   const p = h.split("--");
   return { name: p[0], a: p[1], b: p[2] };
 }
+// Older saves have a single "hardest maps" list: add the saveless one right after it
+function migrateLists() {
+  const L = S.lists || (S.lists = {});
+  if (L.hardMapsSaveless) return;
+  if (L.hardMaps?.title === "Hardest maps (for me)") L.hardMaps.title = "Hardest maps (general)";
+  const out = {};
+  for (const [k, v] of Object.entries(L)) { out[k] = v; if (k === "hardMaps") out.hardMapsSaveless = { title: "Hardest maps (saveless)", items: [] }; }
+  if (!out.hardMapsSaveless) out.hardMapsSaveless = { title: "Hardest maps (saveless)", items: [] };
+  S.lists = out;
+}
 function render() {
   if (!S) return setupScreen();
+  migrateLists();
   const r = route(), app = $("#app");
   const navKey = { wad: null, map: null, demo: "demos" }[r.name] ?? r.name;
   let wadNav = null;
@@ -571,7 +583,7 @@ function bindList(el) {
     const w = S.wads.find(x => x.title.toLowerCase() === v.toLowerCase());
     let item = { label: v };
     if (w && /Wads$/.test(el.dataset.list)) item = { label: w.title, sub: w.authors, ref: `wad--${w.id}` };
-    if (/Maps$/.test(el.dataset.list)) { for (const x of S.wads) { const m = x.maps.find(m => m.name.toLowerCase() === v.toLowerCase()); if (m) { item = { label: m.name, sub: `${x.title} · ${m.slot}`, ref: `map--${x.id}--${m.id}` }; break; } } }
+    if (/Maps/.test(el.dataset.list)) { for (const x of S.wads) { const m = x.maps.find(m => m.name.toLowerCase() === v.toLowerCase()); if (m) { item = { label: m.name, sub: `${x.title} · ${m.slot}`, ref: `map--${x.id}--${m.id}` }; break; } } }
     L.items.push(item); save(); rerender(); });
 }
 function scaleExplainer() {
