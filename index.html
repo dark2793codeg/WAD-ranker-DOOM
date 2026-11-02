@@ -101,10 +101,17 @@ section.block{display:flex;flex-direction:column;gap:14px;margin-top:40px}
 .tile.done .t{color:var(--nukage)}
 
 .pic{aspect-ratio:4/3;width:100%;max-width:100%;border-radius:6px;overflow:hidden;position:relative;background:var(--panel-2);box-shadow:0 6px 18px #0007}
-.pic img{width:100%;height:100%;object-fit:cover;display:block}
+.pic img{display:block}
+/* Pictures are never cropped: the whole image sits on a blurred copy of itself.
+   Frames marked .fit take the image's own shape once it loads (capped in height). */
+img.main{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:1}
+img.bgfill{position:absolute;inset:-8%;width:116%;height:116%;object-fit:cover;filter:blur(18px) brightness(.45) saturate(1.2);pointer-events:none}
+img.pixel{image-rendering:pixelated}
+.pic.fit{max-height:78vh}
 .ph{position:absolute;inset:0;display:flex;align-items:flex-end;padding:10px;font:700 17px/1.05 var(--f-display);color:#f6ead2;text-shadow:0 2px 0 #0009;overflow:hidden;overflow-wrap:anywhere}
 .ph::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,#0000 0 3px,#00000022 3px 4px);pointer-events:none}
 .badge-grade{position:absolute;top:8px;right:8px;z-index:2}
+.pic .ph{z-index:1}
 
 .progress{height:7px;background:var(--line);border-radius:4px;overflow:hidden}
 .progress>i{display:block;height:100%;background:var(--nukage);border-radius:4px}
@@ -174,8 +181,8 @@ select.cell-in{width:auto}
 .empty-note{color:var(--dim);font-style:italic}
 
 /* map page */
-.viewer{position:relative;aspect-ratio:16/9;max-width:100%;background:var(--panel-2) repeating-linear-gradient(45deg,#0000 0 10px,#ffffff05 10px 20px);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--dim);text-align:center}
-.viewer img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;cursor:zoom-in}
+.viewer{position:relative;aspect-ratio:16/9;max-height:80vh;max-width:100%;background:var(--panel-2) repeating-linear-gradient(45deg,#0000 0 10px,#ffffff05 10px 20px);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--dim);text-align:center}
+.viewer img.main{cursor:zoom-in}
 .viewer .cap{position:absolute;left:12px;bottom:12px;z-index:2;font:600 12px/1 var(--f-body);letter-spacing:.1em;text-transform:uppercase;background:#000b;color:var(--fg);padding:6px 9px;border-radius:4px}
 .viewer .count-cap{left:auto;right:12px}
 .viewer .vnav{position:absolute;top:50%;transform:translateY(-50%);z-index:2;border:0;background:#000a;color:var(--fg);width:42px;height:42px;border-radius:50%;cursor:pointer;font-size:18px}
@@ -183,10 +190,9 @@ select.cell-in{width:auto}
 .viewer label{cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:center;padding:20px}
 .strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(46%,150px),1fr));gap:10px;margin-top:10px}
 .thumb{position:relative;aspect-ratio:16/9;border:2px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel-2);cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:12px}
-.thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .thumb.on{border-color:var(--brass)}
-.thumb .cap{position:absolute;left:4px;bottom:4px;font:600 10px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;background:#000b;color:var(--fg);padding:3px 5px;border-radius:3px}
-.thumb .x{position:absolute;top:3px;right:3px;background:#000b;color:var(--fg);border:0;border-radius:3px;cursor:pointer;padding:1px 6px;font-size:12px}
+.thumb .cap{position:absolute;z-index:2;left:4px;bottom:4px;font:600 10px/1 var(--f-body);letter-spacing:.08em;text-transform:uppercase;background:#000b;color:var(--fg);padding:3px 5px;border-radius:3px}
+.thumb .x{position:absolute;z-index:2;top:3px;right:3px;background:#000b;color:var(--fg);border:0;border-radius:3px;cursor:pointer;padding:1px 6px;font-size:12px}
 .pager{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
 .pager .btn{max-width:calc(50% - 6px);overflow:hidden;text-overflow:ellipsis}
 .mapname-big{font:700 clamp(34px,5.5vw,64px)/1.02 var(--f-display);margin-top:6px;overflow-wrap:anywhere}
@@ -403,8 +409,17 @@ const demoDone = w => w.maps.filter(m => m.demo === "Complete").length;
 const wadComplete = w => w.maps.length > 0 && demoDone(w) === w.maps.length;
 
 /* ---------- placeholder titlepic ---------- */
-function picHTML(w, gradeHtml = "") {
-  if (w.titlepic) return `<div class="pic"><img src="${w.titlepic}" alt="${esc(w.title)} title screen" loading="lazy">${gradeHtml}</div>`;
+const fitImgHTML = (src, alt, lazy = true) => `<img class="bgfill" src="${src}" alt="" aria-hidden="true"${lazy ? ' loading="lazy"' : ""}><img class="main" data-fit src="${src}" alt="${alt}"${lazy ? ' loading="lazy"' : ""}>`;
+function fitImg(im) {
+  const w = im.naturalWidth, h = im.naturalHeight; if (!w) return;
+  const box = im.closest(".fit"); if (box) box.style.aspectRatio = `${w} / ${h}`;
+  // Small images (classic 320x200 TITLEPICs) get blown up with crisp pixels instead of blur
+  const shown = im.getBoundingClientRect().width;
+  im.classList.toggle("pixel", w < 800 && shown > w * 1.5);
+}
+document.addEventListener("load", e => { if (e.target instanceof HTMLImageElement && e.target.hasAttribute("data-fit")) fitImg(e.target); }, true);
+function picHTML(w, gradeHtml = "", fit = false) {
+  if (w.titlepic) return `<div class="pic${fit ? " fit" : ""}">${fitImgHTML(w.titlepic, esc(w.title) + " title screen", !fit)}${gradeHtml}</div>`;
   const h = hash(w.title), hue = h % 360, hue2 = (hue + 30 + (h >> 9) % 60) % 360, ang = (h >> 4) % 180;
   const bg = `background:linear-gradient(${ang}deg,hsl(${hue} 45% 22%),hsl(${hue2} 55% 12%) 70%),hsl(${hue} 30% 15%)`;
   return `<div class="pic"><div class="ph" style="${bg}">${esc(w.title)}</div>${gradeHtml}</div>`;
@@ -454,11 +469,23 @@ function bindRich(root, id, setter) {
 }
 
 /* ---------- images ---------- */
-function pickImage(maxW = 1600) {
+// Big images are shrunk to maxW. Small ones are scaled up by a whole-number factor with
+// nearest-neighbour sampling (keeps Doom's pixels sharp) until they reach at least minW.
+function sizeImage(img, maxW, minW) {
+  let w = img.naturalWidth, h = img.naturalHeight, smooth = true, up = false;
+  if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+  else if (w < minW) { let f = Math.ceil(minW / w); while (f > 1 && w * f > maxW) f--; if (f > 1) { w *= f; h *= f; smooth = false; up = true; } }
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d"); x.imageSmoothingEnabled = smooth; if (smooth) x.imageSmoothingQuality = "high";
+  x.drawImage(img, 0, 0, w, h);
+  if (up) { const png = c.toDataURL("image/png"); if (png.length < 3_600_000) return png; return c.toDataURL("image/jpeg", .92); }
+  return c.toDataURL("image/jpeg", .88);
+}
+function pickImage(maxW = 1920, minW = 1280) {
   return new Promise(res => {
     const inp = $("#filePick"); inp.value = "";
     inp.onchange = () => { const f = inp.files[0]; if (!f) return res(null); const rd = new FileReader();
-      rd.onload = () => { const img = new Image(); img.onload = () => { const sc = Math.min(1, maxW / img.width); const c = document.createElement("canvas"); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc); const x = c.getContext("2d"); x.imageSmoothingEnabled = sc < 1; x.drawImage(img, 0, 0, c.width, c.height); const du = c.toDataURL("image/jpeg", .86); if (!SERVER) return res(du); setSaveState("Uploading image…"); storeImage(du, f.name.replace(/\.[^.]+$/, "")).then(u => { setSaveState(""); res(u); }, err => { setSaveState("Upload failed: " + err.message, true); res(null); }); }; img.onerror = () => res(null); img.src = rd.result; };
+      rd.onload = () => { const img = new Image(); img.onload = () => { const du = sizeImage(img, maxW, minW); if (!SERVER) return res(du); setSaveState("Uploading image…"); storeImage(du, f.name.replace(/\.[^.]+$/, "")).then(u => { setSaveState(""); res(u); }, err => { setSaveState("Upload failed: " + err.message, true); res(null); }); }; img.onerror = () => res(null); img.src = rd.result; };
       rd.readAsDataURL(f); };
     inp.click();
   });
@@ -491,6 +518,7 @@ function render() {
   $$("#nav a").forEach(a => a.dataset.nav === (wadNav || navKey) ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
   const views = { about: viewAbout, wads: () => viewCatalog(false), iwads: viewIwads, wad: () => viewWad(r.a), map: () => viewMap(r.a, r.b), demos: viewDemos, demo: () => viewDemoWad(r.a) };
   (views[r.name] || viewAbout)(app);
+  $$("img[data-fit]", app).forEach(im => im.complete && fitImg(im));
 }
 let lastHash = location.hash;
 window.addEventListener("hashchange", () => { render(); if (location.hash !== lastHash) window.scrollTo(0, 0); lastHash = location.hash; });
@@ -743,7 +771,7 @@ function viewWad(id, app = $("#app")) {
   <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs" : "WAD Catalog"}</a><span>/</span><span>${esc(w.title)}</span></div>
   ${wadPager(w)}
   <div class="hero">
-    <div class="stack" style="gap:10px">${picHTML(w)}
+    <div class="stack" style="gap:10px">${picHTML(w, "", true)}
       ${EDIT ? `<div class="row"><button class="btn small" id="setPic" type="button">${w.titlepic ? "Replace" : "Upload"} TITLEPIC</button>${w.titlepic ? `<button class="btn small danger" id="rmPic" type="button">Remove</button>` : ""}</div>` : ""}
     </div>
     <div style="min-width:0">
@@ -790,7 +818,7 @@ function viewWad(id, app = $("#app")) {
   if (EDIT) {
     bindRich(app, "rt-wad", v => w.review = v);
     $("#editWad").onclick = () => wadForm(w);
-    $("#setPic").onclick = async () => { const src = await pickImage(960); if (src) { w.titlepic = src; save(); rerender(); } };
+    $("#setPic").onclick = async () => { const src = await pickImage(1600, 960); if (src) { w.titlepic = src; save(); rerender(); } };
     $("#rmPic")?.addEventListener("click", () => { w.titlepic = ""; save(); rerender(); });
     [["wq", "q"], ["wd", "d"], ["wm", "m"]].forEach(([el, k]) => $("#" + el).addEventListener("change", e => { w[k] = e.target.value === "" ? null : +e.target.value; save(); rerender(); }));
     $("#addMap").onclick = () => {
@@ -842,15 +870,15 @@ function viewMap(wid, mid, app = $("#app")) {
   </section>
   <div style="margin-top:28px">${pagerHTML(prev, next, x => `map--${w.id}--${x.id}`, x => `${x.slot} ${x.name}`.trim(), "map")}</div>
   <section class="block" style="margin-top:18px" aria-label="Photo gallery">
-    <div class="viewer">${src ? `<img src="${src}" alt="${esc(m.name)}: ${capOf(cur)}" id="viewerImg">` : EDIT ? `<label data-addshot="${cur}"><b style="color:var(--fg);font-size:28px">+</b>Add ${capOf(cur).toLowerCase()} (1920×1080 works best)</label>` : `<span>No screenshots yet</span>`}
+    <div class="viewer${src ? " fit" : ""}">${src ? fitImgHTML(src, `${esc(m.name)}: ${capOf(cur)}`, false).replace('class="main"', 'class="main" id="viewerImg"') : EDIT ? `<label data-addshot="${cur}"><b style="color:var(--fg);font-size:28px">+</b>Add ${capOf(cur).toLowerCase()} (1920×1080 works best)</label>` : `<span>No screenshots yet</span>`}
       <span class="cap">${capOf(cur)}</span>${filled.length > 1 ? `<span class="cap count-cap">${filled.indexOf(cur) + 1} / ${filled.length}</span><button class="vnav l" data-step="-1" aria-label="Previous shot">‹</button><button class="vnav r" data-step="1" aria-label="Next shot">›</button>` : ""}</div>
-    ${stripIdx.length > 1 || EDIT ? `<div class="strip">${stripIdx.map(i => `<button type="button" class="thumb ${i === cur ? "on" : ""}" data-pick="${i}" aria-label="Show ${capOf(i)}">${shots[i] ? `<img src="${shots[i]}" alt="" loading="lazy">` : "+ Add"}<span class="cap">${capOf(i)}</span>${EDIT && shots[i] ? `<span class="x" data-rmshot="${i}" role="button" aria-label="Remove ${capOf(i)}">✕</span>` : ""}</button>`).join("")}
+    ${stripIdx.length > 1 || EDIT ? `<div class="strip">${stripIdx.map(i => `<button type="button" class="thumb ${i === cur ? "on" : ""}" data-pick="${i}" aria-label="Show ${capOf(i)}">${shots[i] ? fitImgHTML(shots[i], "") : "+ Add"}<span class="cap">${capOf(i)}</span>${EDIT && shots[i] ? `<span class="x" data-rmshot="${i}" role="button" aria-label="Remove ${capOf(i)}">✕</span>` : ""}</button>`).join("")}
       ${EDIT ? `<button type="button" class="thumb" data-addshot="${shots.length}" aria-label="Add another screenshot">+ Another shot</button>` : ""}</div>` : ""}
   </section>
   <section class="block"><h2>Review</h2>${rich("rt-map", m.review, "No review yet.")}</section>
   <section class="block"><h2>Grades</h2><div class="grade-pick">${ladder("q", Q_SCALE, "Quality")}${ladder("d", D_SCALE, "Difficulty")}${ladder("m", Q_SCALE, "Music")}</div></section>
   <div style="margin-top:40px">${pagerHTML(prev, next, x => `map--${w.id}--${x.id}`, x => `${x.slot} ${x.name}`.trim(), "map")}</div>`;
-  async function addShot(i) { const url = await pickImage(1920); if (!url) return; while (m.shots.length < i) m.shots.push(null); m.shots[i] = url; shotSel.i = i; save(); rerender(); }
+  async function addShot(i) { const url = await pickImage(1920, 1280); if (!url) return; while (m.shots.length < i) m.shots.push(null); m.shots[i] = url; shotSel.i = i; save(); rerender(); }
   $("#viewerImg")?.addEventListener("click", e => lightbox(e.target.src));
   app.querySelectorAll("[data-step]").forEach(b => b.onclick = () => { const k = filled.indexOf(cur); shotSel.i = filled[(k + +b.dataset.step + filled.length) % filled.length]; rerender(); });
   app.querySelectorAll("[data-pick]").forEach(b => b.onclick = e => { if (e.target.closest("[data-rmshot]")) return; const i = +b.dataset.pick; if (!shots[i] && EDIT) return addShot(i); shotSel.i = i; rerender(); });
@@ -904,7 +932,7 @@ function viewDemoWad(id, app = $("#app")) {
   <div class="crumbs"><a href="#demos">Demo Tracker</a><span>/</span><span>${esc(w.title)}</span></div>
   ${wadPager(w, true)}
   <div class="hero" style="grid-template-columns:minmax(0,300px) minmax(0,1fr)">
-    ${picHTML(w)}
+    ${picHTML(w, "", true)}
     <div class="stack" style="gap:10px;min-width:0">
       <span class="eyebrow">${esc(w.iwad)} · ${esc(w.comp)}</span><h1 style="${done ? "color:var(--nukage)" : ""}">${esc(w.title)}</h1>
       <span class="muted">${esc(w.authors)} · <a href="#wad--${w.id}" style="color:var(--brass)">Review page</a></span>
