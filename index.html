@@ -162,6 +162,32 @@ table.maps a.mapname:hover{color:var(--brass);border-color:var(--brass)}
 .st.st-rt{background:#3a2e10;color:var(--route)}
 .st.no{background:var(--panel-2);color:var(--dim)}
 tr.done td{background:#86c43f0d}
+/* Map list: every column fits on desktop; on phones each map becomes a compact card */
+table.maplist{font-size:13.5px}
+table.maplist th,table.maplist td{padding:8px 8px}
+table.maplist td{white-space:normal}
+table.maplist .ctr{text-align:center}
+table.maplist td.c-map{min-width:150px}
+table.maplist td.c-midi{min-width:120px;font-size:13px}
+table.maplist .sub{font-size:12px;color:var(--muted);line-height:1.3;margin-top:2px}
+table.maplist td.ctr .g{min-width:30px;height:22px;font-size:12px}
+table.maplist td.num{white-space:nowrap}
+table.maplist td.c-del{width:1%}
+@media (max-width:760px){
+  table.maplist thead{display:none}
+  table.maplist,table.maplist tbody{display:block}
+  table.maplist tr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  table.maplist td{display:block;padding:0;border:0;text-align:left!important;min-width:0!important}
+  table.maplist td.c-slot{grid-column:1/2}
+  table.maplist td.c-map{grid-column:2/-1}
+  table.maplist td.c-midi{grid-column:1/-1}
+  table.maplist td[data-l]::before{content:attr(data-l);display:block;font:600 10px/1.2 var(--f-body);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:3px}
+  table.maplist td.c-del{grid-column:-2/-1;text-align:right!important}
+  table.maplist tr.done{background:#86c43f0d}
+  table.maplist tr td,table.maplist tr:hover td{background:none}
+  table.maplist td[data-l]:empty{display:none}
+}
+
 .cell-in{padding:4px 6px;width:80px}
 .box{display:inline-grid;place-items:center;width:20px;height:20px;border:2px solid var(--dim);border-radius:4px;font:800 13px/1 var(--f-body);color:#132006;vertical-align:middle}
 .box.b-ok{background:var(--nukage);border-color:var(--nukage)}
@@ -743,6 +769,12 @@ function confirmBox(msg, label, onYes) {
 }
 
 /* ---------- WAD PAGE ---------- */
+const gradeCell = (n, scale) => n == null ? `<span class="sub">—</span>` : `${gradeChip(n, scale)}<div class="sub">${fmtN(n)}</div>`;
+function miniStatus(st, what) {
+  if (/^Complete/.test(st || "")) return `<span class="st ok" title="${what}: ${esc(st)}">✓</span>`;
+  if (/Routing|Progress/.test(st || "")) return `<span class="st st-rt" title="${what}: ${esc(st)}">Routing</span>`;
+  return `<span class="sub" title="${what}: ${esc(st || "Incomplete")}">—</span>`;
+}
 function wadOrder(w, demo) {
   if (demo) { const st = pref.get("demo", { q: "", sort: "release", dir: 1, iwad: "", comp: "" }); return filterSort([...S.wads], { ...st, q: "" }, { ...SORTS, progress: [0, (a, b) => demoDone(b) / (b.maps.length || 1) - demoDone(a) / (a.maps.length || 1)] }); }
   if (w.isIWAD) return S.wads.filter(x => x.isIWAD).sort((a, b) => (a.release || "").localeCompare(b.release || ""));
@@ -801,20 +833,22 @@ function viewWad(id, app = $("#app")) {
   </div>
   <section class="block"><h2>${w.isIWAD ? "The write-up" : "Overview"}</h2>${rich("rt-wad", w.review, w.isIWAD ? "The long-form review of this IWAD." : "Your overall thoughts on this WAD.")}</section>
   <section class="block"><div class="row" style="justify-content:space-between"><h2>Map list</h2>${EDIT ? `<button class="btn small primary" id="addMap" type="button">+ Add map</button>` : ""}</div>
-  <div class="tablewrap"><table class="maps"><thead><tr>
-    <th>Slot</th><th>Map name</th><th>Map author(s)</th><th>MIDI</th><th>MIDI author(s)</th><th>Quality</th><th>Difficulty</th><th>Music</th>
-    <th class="num">Kills</th><th class="num">Items</th><th class="num">Secrets</th><th>Casual max</th><th>Demo</th><th class="num">Attempts</th><th>Index rank</th><th class="num">Index pts</th><th class="num">UV-max time</th>${EDIT ? "<th></th>" : ""}
+  <div class="tablewrap"><table class="maps maplist"><thead><tr>
+    <th>Slot</th><th>Map</th><th>Music track</th><th class="ctr" title="Quality">Qual.</th><th class="ctr" title="Difficulty">Diff.</th><th class="ctr" title="Music">Music</th>
+    <th class="num" title="Kills / Items / Secrets">K / I / S</th><th class="ctr" title="Casual UV-max with saves">Max</th><th class="ctr" title="Demo status">Demo</th><th class="num" title="Demo attempts">Tries</th><th>Index</th><th class="num" title="UV-max time">Time</th>${EDIT ? "<th></th>" : ""}
   </tr></thead><tbody>${maps.map(m => `<tr class="${m.demo === "Complete" ? "done" : ""}">
-    <td><span class="slot">${esc(m.slot)}</span></td>
-    <td class="wrapcell"><a class="mapname" href="#map--${w.id}--${m.id}">${esc(m.name || "Untitled")}</a></td>
-    <td class="wrapcell">${esc(m.authors)}</td><td class="wrapcell">${esc(m.midi)}</td><td class="wrapcell">${esc(m.midiBy)}</td>
-    <td>${gradeChip(m.q, Q_SCALE)} <span class="gnum">${m.q ?? ""}</span></td>
-    <td>${gradeChip(m.d, D_SCALE)} <span class="gnum">${m.d ?? ""}</span></td>
-    <td><span class="gnum">${m.m ?? "—"}</span></td>
-    <td class="num">${m.kills ?? ""}</td><td class="num">${m.items ?? ""}</td><td class="num">${m.secrets ?? ""}</td>
-    <td>${statusChip(m.casual)}</td><td>${statusChip(m.demo)}</td><td class="num">${m.attempts ?? ""}</td>
-    <td>${esc(m.rank)}</td><td class="num">${m.rank && m.demo === "Complete" ? (INDEX_PTS[m.rank] || "") : ""}</td><td class="num">${fmtTime(m.uvTime)}</td>
-    ${EDIT ? `<td><button class="icon-btn" data-delmap="${m.id}" aria-label="Delete ${esc(m.name || m.slot)}">✕</button></td>` : ""}</tr>`).join("")}</tbody></table></div></section>`;
+    <td class="c-slot"><span class="slot">${esc(m.slot)}</span></td>
+    <td class="c-map"><a class="mapname" href="#map--${w.id}--${m.id}">${esc(m.name || "Untitled")}</a>${m.authors ? `<div class="sub">${esc(m.authors)}</div>` : ""}</td>
+    <td class="c-midi" data-l="Music track">${m.midi ? `${esc(m.midi)}${m.midiBy ? `<div class="sub">${esc(m.midiBy)}</div>` : ""}` : `<span class="sub">—</span>`}</td>
+    <td class="ctr" data-l="Quality">${gradeCell(m.q, Q_SCALE)}</td>
+    <td class="ctr" data-l="Difficulty">${gradeCell(m.d, D_SCALE)}</td>
+    <td class="ctr" data-l="Music">${gradeCell(m.m, Q_SCALE)}</td>
+    <td class="num" data-l="K / I / S">${[m.kills, m.items, m.secrets].some(x => x != null) ? [m.kills, m.items, m.secrets].map(x => x ?? "–").join(" / ") : ""}</td>
+    <td class="ctr" data-l="Max">${miniStatus(m.casual, "Casual max")}</td><td class="ctr" data-l="Demo">${miniStatus(m.demo, "Demo")}</td>
+    <td class="num" data-l="Tries">${m.attempts ?? ""}</td>
+    <td data-l="Index">${m.rank ? `${esc(m.rank)}<div class="sub">${m.demo === "Complete" ? (INDEX_PTS[m.rank] || 0).toLocaleString() + " pts" : "not banked"}</div>` : ""}</td>
+    <td class="num" data-l="Time">${fmtTime(m.uvTime)}</td>
+    ${EDIT ? `<td class="c-del"><button class="icon-btn" data-delmap="${m.id}" aria-label="Delete ${esc(m.name || m.slot)}">✕</button></td>` : ""}</tr>`).join("")}</tbody></table></div></section>`;
   if (EDIT) {
     bindRich(app, "rt-wad", v => w.review = v);
     $("#editWad").onclick = () => wadForm(w);
