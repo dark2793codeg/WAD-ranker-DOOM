@@ -920,7 +920,7 @@ function viewWad(id, app = $("#app")) {
       </div>
     </div>
   </div>
-  <section class="block"><h2>${w.isIWAD ? "The write-up" : "Overview"}</h2>${rich("rt-wad", w.review, w.isIWAD ? "The long-form review of this IWAD." : "Your overall thoughts on this WAD.")}</section>
+  <section class="block"><h2>Introduction</h2>${rich("rt-wad", w.review, "Set the scene: what this WAD is, who made it, and what you expected going in.")}</section>
   <section class="block"><div class="row" style="justify-content:space-between"><h2>Map list</h2>${EDIT ? `<button class="btn small primary" id="addMap" type="button">+ Add map</button>` : ""}</div>
   <div class="tablewrap"><table class="maps maplist"><thead><tr>
     <th>Slot</th><th>Map</th><th>Music track</th><th class="ctr" title="Quality">Qual.</th><th class="ctr" title="Difficulty">Diff.</th><th class="ctr" title="Music">Music</th>
@@ -936,10 +936,12 @@ function viewWad(id, app = $("#app")) {
     <td class="ctr" data-l="Max">${miniStatus(m.casual, "Casual max")}</td><td class="ctr" data-l="Demo">${miniStatus(m.demo, "Demo")}</td>
     <td class="num" data-l="Tries">${m.attempts ?? ""}</td>
     <td data-l="Index">${m.rank ? `${esc(m.rank)}<div class="sub">${m.demo === "Complete" ? (INDEX_PTS[m.rank] || 0).toLocaleString() + " pts" : "not banked"}</div>` : ""}</td>
-    <td class="num" data-l="Time">${fmtTime(m.uvTime)}</td></tr>`).join("")}</tbody></table></div></section>`;
+    <td class="num" data-l="Time">${fmtTime(m.uvTime)}</td></tr>`).join("")}</tbody></table></div></section>
+  <section class="block"><h2>Conclusion</h2>${rich("rt-wad-end", w.conclusion, "Your final verdict on the WAD as a whole.")}</section>`;
   if (EDIT) {
     bindMapListEditing(app, w);
     bindRich(app, "rt-wad", v => w.review = v);
+    bindRich(app, "rt-wad-end", v => w.conclusion = v);
     $("#editWad").onclick = () => wadForm(w);
     $("#setPic").onclick = async () => { const src = await pickImage(1600, 960); if (src) { w.titlepic = src; save(); rerender(); } };
     $("#rmPic")?.addEventListener("click", () => { w.titlepic = ""; save(); rerender(); });
