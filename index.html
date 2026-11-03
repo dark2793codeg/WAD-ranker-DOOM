@@ -223,10 +223,10 @@ select.cell-in{width:auto}
 .rt-tools{display:flex;gap:2px;padding:6px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .rt-tools button{border:1px solid transparent;background:transparent;border-radius:4px;padding:3px 9px;cursor:pointer;color:var(--muted);font-size:14px}
 .rt-tools button:hover{color:var(--fg);border-color:var(--line)}
-.rt{padding:14px 16px;min-height:120px;max-width:72ch;outline:none;line-height:1.65}
+.rt{padding:14px 16px;min-height:120px;outline:none;line-height:1.65}
 .rt:empty::before{content:attr(data-ph);color:var(--dim);font-style:italic}
 .rt p{margin:0 0 .8em}.rt ul,.rt ol{margin:.3em 0 .9em;padding-left:1.4em}
-.prose{max-width:72ch;line-height:1.65}
+.prose{line-height:1.65}
 .prose p{margin:0 0 .8em}.prose ul,.prose ol{padding-left:1.4em}
 .empty-note{color:var(--dim);font-style:italic}
 
@@ -627,7 +627,7 @@ function viewAbout(app) {
   </section>
   ${scaleExplainer()}
   <section class="block"><h2>Doomed index points</h2>
-    <p class="muted" style="margin:0;max-width:72ch">Ranks on the DSDA Doomed index, with the points each completed demo is worth on the Demo Tracker. You've banked <b style="color:var(--fg)">${pts.toLocaleString()}</b> points across completed demos.</p>
+    <p class="muted" style="margin:0">Ranks on the DSDA Doomed index, with the points each completed demo is worth on the Demo Tracker. You've banked <b style="color:var(--fg)">${pts.toLocaleString()}</b> points across completed demos.</p>
     <div class="scale">${INDEX.map(([n, p]) => `<span><span class="chip">${n}</span>${p.toLocaleString()}</span>`).join("")}</div>
   </section>`;
   if (EDIT) {
@@ -667,7 +667,7 @@ function bindList(el) {
 function scaleExplainer() {
   const row = sc => sc.map(([l, n]) => `<span><span class="g ${l[0]}">${l}</span>${n}</span>`).join("");
   return `<section class="block"><h2>How the grades work</h2>
-  <p class="muted" style="margin:0;max-width:72ch">Every letter sits on the same 0–10 scale as the point columns in my spreadsheet, half a point per step. Map grades are stored as numbers, so a WAD's averages are plain means of its maps, then shown as the nearest letter.</p>
+  <p class="muted" style="margin:0">Every letter sits on the same 0–10 scale as the point columns in my spreadsheet, half a point per step. Map grades are stored as numbers, so a WAD's averages are plain means of its maps, then shown as the nearest letter.</p>
   <div class="scale-table">
     <div class="stack" style="gap:8px"><h3>Quality · S+ to F</h3><div class="scale">${row(Q_SCALE)}</div><span class="muted" style="font-size:13px">Anything under 2.75 is an F.</span></div>
     <div class="stack" style="gap:8px"><h3>Difficulty · X+ to E−</h3><div class="scale">${row(D_SCALE)}</div><span class="muted" style="font-size:13px">X is beyond-A territory: slaughter and top-tier demo difficulty.</span></div>
@@ -734,7 +734,7 @@ function viewIwads(app) {
   const list = S.wads.filter(w => w.isIWAD).sort((a, b) => (a.release || "").localeCompare(b.release || ""));
   app.innerHTML = `<div class="row" style="justify-content:space-between"><div><span class="eyebrow">Classic Doom</span><h1>IWADs and Official Releases</h1></div>
     ${EDIT ? `<button class="btn primary" id="addWad" type="button">+ Add release</button>` : ""}</div>
-    <p class="muted" style="max-width:72ch">The commercial games and official add-ons get longer write-ups. Tick “Show in IWADs and Official Releases” in any WAD’s edit form to move it here.</p>
+    <p class="muted">The commercial games and official add-ons get longer write-ups. Tick “Show in IWADs and Official Releases” in any WAD’s edit form to move it here.</p>
     <div class="iwads">${list.map(w => {
       const ex = w.review ? new DOMParser().parseFromString(sanitize(w.review), "text/html").body.textContent : "";
       return `<a class="iwad" href="#wad--${w.id}">${picHTML(w)}<div class="stack" style="gap:8px;min-width:0">
