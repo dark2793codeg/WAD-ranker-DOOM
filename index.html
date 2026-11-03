@@ -173,6 +173,22 @@ table.maplist .sub{font-size:12px;color:var(--muted);line-height:1.3;margin-top:
 table.maplist td.ctr .g{min-width:30px;height:22px;font-size:12px}
 table.maplist td.num{white-space:nowrap}
 table.maplist td.c-del{width:1%}
+table.maplist .ed{display:inline-block;min-width:1.6em;padding:1px 3px;margin:-1px -3px;border-radius:3px;border-bottom:1px dashed var(--line);outline:none;cursor:text}
+table.maplist .ed:hover{background:#ffffff0a}
+table.maplist .ed:focus{background:var(--bg);box-shadow:0 0 0 1px var(--brass);border-bottom-color:transparent}
+table.maplist .ed:empty::before{content:attr(data-ph);color:var(--dim);font-style:italic}
+table.maplist .mapname-ed{font-weight:600;font-size:15px;color:var(--fg)}
+table.maplist .namecell{display:flex;align-items:baseline;gap:6px}
+table.maplist .open{color:var(--muted);text-decoration:none;font-size:13px;padding:0 3px;border-radius:3px}
+table.maplist .open:hover{color:var(--brass)}
+table.maplist .kis{white-space:nowrap}
+table.maplist .kis .ed{min-width:1.2em;text-align:right}
+table.maplist select.gsel{appearance:none;-webkit-appearance:none;border:0;border-radius:5px;font:700 12px/1 var(--f-display);height:22px;min-width:34px;padding:0 6px;text-align:center;text-align-last:center;cursor:pointer;color:#130f0a}
+table.maplist select.gsel.none{background:transparent;border:1px dashed var(--line);color:var(--dim)}
+table.maplist select.gsel option{background:var(--panel);color:var(--fg)}
+table.maplist button.cyc{border:0;background:transparent;padding:2px;cursor:pointer;border-radius:4px}
+table.maplist button.cyc:hover{background:#ffffff0a}
+table.maplist select.rsel{width:auto;max-width:100%;font-size:12.5px;padding:3px 4px}
 @media (max-width:760px){
   table.maplist thead{display:none}
   table.maplist,table.maplist tbody{display:block}
@@ -769,6 +785,59 @@ function confirmBox(msg, label, onYes) {
 }
 
 /* ---------- WAD PAGE ---------- */
+/* Map list in edit mode: every field edits in place and writes to the same map record the map page shows */
+const NUM_FIELDS = new Set(["kills", "items", "secrets", "attempts"]);
+const ed = (m, f, val, ph, cls = "") => `<span class="ed ${cls}" contenteditable="true" spellcheck="false" data-mid="${m.id}" data-f="${f}" data-ph="${esc(ph)}" role="textbox" aria-label="${esc(ph)}">${esc(val ?? "")}</span>`;
+function gradeSel(m, f, scale, label) {
+  const L = letter(m[f], scale);
+  return `<select class="gsel ${L ? "g " + L[0] : "none"}" data-mid="${m.id}" data-f="${f}" aria-label="${label}"><option value="">—</option>${scale.map(([l, n]) => `<option value="${n}" ${L === l ? "selected" : ""}>${l}</option>`).join("")}</select>${m[f] != null ? `<div class="sub">${fmtN(m[f])}</div>` : ""}`;
+}
+function editRow(w, m) {
+  return `<tr class="${m.demo === "Complete" ? "done" : ""} editing">
+    <td class="c-slot">${ed(m, "slot", m.slot, "Slot", "slot")}</td>
+    <td class="c-map"><div class="namecell">${ed(m, "name", m.name, "Map name", "mapname-ed")}<a class="open" href="#map--${w.id}--${m.id}" title="Open map page" aria-label="Open ${esc(m.name || m.slot)} page">↗</a></div><div class="sub">${ed(m, "authors", m.authors, "Author(s)")}</div></td>
+    <td class="c-midi" data-l="Music track">${ed(m, "midi", m.midi, "MIDI name")}<div class="sub">${ed(m, "midiBy", m.midiBy, "MIDI author(s)")}</div></td>
+    <td class="ctr" data-l="Quality">${gradeSel(m, "q", Q_SCALE, "Quality")}</td>
+    <td class="ctr" data-l="Difficulty">${gradeSel(m, "d", D_SCALE, "Difficulty")}</td>
+    <td class="ctr" data-l="Music">${gradeSel(m, "m", Q_SCALE, "Music")}</td>
+    <td class="num kis" data-l="K / I / S">${ed(m, "kills", m.kills, "K")} / ${ed(m, "items", m.items, "I")} / ${ed(m, "secrets", m.secrets, "S")}</td>
+    <td class="ctr" data-l="Max"><button type="button" class="cyc" data-cyc="casual" data-mid="${m.id}" title="Click to change">${miniStatus(m.casual, "Casual max")}</button></td>
+    <td class="ctr" data-l="Demo"><button type="button" class="cyc" data-cyc="demo" data-mid="${m.id}" title="Click to change">${miniStatus(m.demo, "Demo")}</button></td>
+    <td class="num" data-l="Tries">${ed(m, "attempts", m.attempts, "0")}</td>
+    <td data-l="Index"><select class="cell-in rsel" data-mid="${m.id}" data-f="rank" aria-label="Index rank"><option value="">—</option>${INDEX.map(([r]) => `<option ${m.rank === r ? "selected" : ""}>${r}</option>`).join("")}</select>${m.rank ? `<div class="sub">${m.demo === "Complete" ? (INDEX_PTS[m.rank] || 0).toLocaleString() + " pts" : "not banked"}</div>` : ""}</td>
+    <td class="num" data-l="Time">${ed(m, "uvTime", fmtTime(m.uvTime), "m:ss")}</td>
+    <td class="c-del"><button class="icon-btn" data-delmap="${m.id}" aria-label="Delete ${esc(m.name || m.slot)}">✕</button></td></tr>`;
+}
+function bindMapListEditing(app, w) {
+  const mapOf = el => w.maps.find(x => x.id === el.dataset.mid);
+  $$("span.ed", app).forEach(el => {
+    el.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); el.blur(); } if (e.key === "Escape") { el.textContent = el.dataset.orig ?? el.textContent; el.blur(); } });
+    el.addEventListener("focus", () => { el.dataset.orig = el.textContent; });
+    el.addEventListener("paste", e => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain").replace(/\s+/g, " ")); });
+    el.addEventListener("blur", () => {
+      const m = mapOf(el), f = el.dataset.f, raw = el.textContent.replace(/\s+/g, " ").trim();
+      let v = raw;
+      if (NUM_FIELDS.has(f)) { v = raw === "" ? null : Math.max(0, Math.round(+raw.replace(/[^0-9.]/g, ""))); if (Number.isNaN(v)) v = m[f]; el.textContent = v ?? ""; }
+      if (f === "uvTime") { v = raw === "" ? null : parseTime(raw); if (v == null && raw !== "") v = m.uvTime; el.textContent = fmtTime(v); }
+      if (f === "slot") v = raw.toUpperCase() || m.slot;
+      if (m[f] === v) return;
+      m[f] = v; save();
+      if (f === "slot") rerender();
+    });
+  });
+  $$("select.gsel, select.rsel", app).forEach(sel => sel.addEventListener("change", () => {
+    const m = mapOf(sel), f = sel.dataset.f;
+    m[f] = f === "rank" ? sel.value : sel.value === "" ? null : +sel.value;
+    save(); rerender();
+  }));
+  $$("button.cyc", app).forEach(b => b.addEventListener("click", () => {
+    const m = mapOf(b), f = b.dataset.cyc;
+    m[f] = f === "casual" ? (m.casual === "Complete" ? "Incomplete" : "Complete") : MAP_DEMO[(MAP_DEMO.indexOf(m.demo) + 1) % 3];
+    if (f === "demo") syncWadDemo(w);
+    save(); rerender();
+  }));
+}
+
 const gradeCell = (n, scale) => n == null ? `<span class="sub">—</span>` : `${gradeChip(n, scale)}<div class="sub">${fmtN(n)}</div>`;
 function miniStatus(st, what) {
   if (/^Complete/.test(st || "")) return `<span class="st ok" title="${what}: ${esc(st)}">✓</span>`;
@@ -836,7 +905,7 @@ function viewWad(id, app = $("#app")) {
   <div class="tablewrap"><table class="maps maplist"><thead><tr>
     <th>Slot</th><th>Map</th><th>Music track</th><th class="ctr" title="Quality">Qual.</th><th class="ctr" title="Difficulty">Diff.</th><th class="ctr" title="Music">Music</th>
     <th class="num" title="Kills / Items / Secrets">K / I / S</th><th class="ctr" title="Casual UV-max with saves">Max</th><th class="ctr" title="Demo status">Demo</th><th class="num" title="Demo attempts">Tries</th><th>Index</th><th class="num" title="UV-max time">Time</th>${EDIT ? "<th></th>" : ""}
-  </tr></thead><tbody>${maps.map(m => `<tr class="${m.demo === "Complete" ? "done" : ""}">
+  </tr></thead><tbody>${maps.map(m => EDIT ? editRow(w, m) : `<tr class="${m.demo === "Complete" ? "done" : ""}">
     <td class="c-slot"><span class="slot">${esc(m.slot)}</span></td>
     <td class="c-map"><a class="mapname" href="#map--${w.id}--${m.id}">${esc(m.name || "Untitled")}</a>${m.authors ? `<div class="sub">${esc(m.authors)}</div>` : ""}</td>
     <td class="c-midi" data-l="Music track">${m.midi ? `${esc(m.midi)}${m.midiBy ? `<div class="sub">${esc(m.midiBy)}</div>` : ""}` : `<span class="sub">—</span>`}</td>
@@ -847,9 +916,9 @@ function viewWad(id, app = $("#app")) {
     <td class="ctr" data-l="Max">${miniStatus(m.casual, "Casual max")}</td><td class="ctr" data-l="Demo">${miniStatus(m.demo, "Demo")}</td>
     <td class="num" data-l="Tries">${m.attempts ?? ""}</td>
     <td data-l="Index">${m.rank ? `${esc(m.rank)}<div class="sub">${m.demo === "Complete" ? (INDEX_PTS[m.rank] || 0).toLocaleString() + " pts" : "not banked"}</div>` : ""}</td>
-    <td class="num" data-l="Time">${fmtTime(m.uvTime)}</td>
-    ${EDIT ? `<td class="c-del"><button class="icon-btn" data-delmap="${m.id}" aria-label="Delete ${esc(m.name || m.slot)}">✕</button></td>` : ""}</tr>`).join("")}</tbody></table></div></section>`;
+    <td class="num" data-l="Time">${fmtTime(m.uvTime)}</td></tr>`).join("")}</tbody></table></div></section>`;
   if (EDIT) {
+    bindMapListEditing(app, w);
     bindRich(app, "rt-wad", v => w.review = v);
     $("#editWad").onclick = () => wadForm(w);
     $("#setPic").onclick = async () => { const src = await pickImage(1600, 960); if (src) { w.titlepic = src; save(); rerender(); } };
