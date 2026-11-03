@@ -269,7 +269,7 @@ dialog .dfoot{padding:14px 20px;border-top:1px solid var(--line);display:flex;ju
     <nav class="main" id="nav">
       <a href="#about" data-nav="about">Home</a>
       <a href="#wads" data-nav="wads">WAD Catalog</a>
-      <a href="#iwads" data-nav="iwads">IWADs</a>
+      <a href="#iwads" data-nav="iwads">IWADs and Official Releases</a>
       <a href="#demos" data-nav="demos">Demo Tracker</a>
     </nav>
     <div class="tools">
@@ -682,16 +682,16 @@ function viewCatalog(_, app = $("#app")) {
 }
 function viewIwads(app) {
   const list = S.wads.filter(w => w.isIWAD).sort((a, b) => (a.release || "").localeCompare(b.release || ""));
-  app.innerHTML = `<div class="row" style="justify-content:space-between"><div><span class="eyebrow">The official releases</span><h1>IWADs</h1></div>
-    ${EDIT ? `<button class="btn primary" id="addWad" type="button">+ Add IWAD</button>` : ""}</div>
-    <p class="muted" style="max-width:72ch">The commercial games get longer write-ups. Mark any WAD as an IWAD from its edit form to move it here.</p>
+  app.innerHTML = `<div class="row" style="justify-content:space-between"><div><span class="eyebrow">Classic Doom</span><h1>IWADs and Official Releases</h1></div>
+    ${EDIT ? `<button class="btn primary" id="addWad" type="button">+ Add release</button>` : ""}</div>
+    <p class="muted" style="max-width:72ch">The commercial games and official add-ons get longer write-ups. Tick “Show in IWADs and Official Releases” in any WAD’s edit form to move it here.</p>
     <div class="iwads">${list.map(w => {
       const ex = w.review ? new DOMParser().parseFromString(sanitize(w.review), "text/html").body.textContent : "";
       return `<a class="iwad" href="#wad--${w.id}">${picHTML(w)}<div class="stack" style="gap:8px;min-width:0">
         <h3 style="font:700 22px/1.15 var(--f-display)">${esc(w.title)}</h3>
         <span class="muted" style="font-size:14px">${esc(w.authors)} · ${year(w.release)} · ${w.maps.length} maps</span>
         <div class="row" style="gap:8px">${gradeChip(wadQ(w), Q_SCALE)}${gradeChip(wadD(w), D_SCALE)}</div>
-        <span class="excerpt">${ex ? esc(ex) : "<i>No write-up yet.</i>"}</span></div></a>`; }).join("") || `<p class="empty-note">No IWADs yet.</p>`}</div>`;
+        <span class="excerpt">${ex ? esc(ex) : "<i>No write-up yet.</i>"}</span></div></a>`; }).join("") || `<p class="empty-note">Nothing here yet.</p>`}</div>`;
   $("#addWad")?.addEventListener("click", () => wadForm(null, true));
 }
 
@@ -715,7 +715,7 @@ function wadForm(w, iwadDefault = false) {
     <label class="field"><span>Casual status (UV-max w/ saves)</span><select name="casual">${opt(WAD_STATUS, w.casual)}</select></label>
     <label class="field"><span>Demo status</span><select name="demo">${opt(WAD_STATUS, w.demo)}</select></label>
     <label class="field wide"><span>Link (idgames, Doomworld thread…)</span><input type="url" name="links" value="${esc(w.links)}" placeholder="https://"></label>
-    <label class="check field wide"><input type="checkbox" name="isIWAD" ${w.isIWAD ? "checked" : ""}> Show in the IWADs section</label>
+    <label class="check field wide"><input type="checkbox" name="isIWAD" ${w.isIWAD ? "checked" : ""}> Show in IWADs and Official Releases</label>
   </div>${isNew ? `<p class="muted" style="font-size:13px">New WADs get empty MAP01–MAPxx rows (E1M1… for Doom) that you can fill in from the map pages.</p>` : ""}</div>
   <div class="dfoot">${!isNew ? `<button type="button" class="btn danger" id="delWad" style="margin-right:auto">Delete WAD</button>` : ""}<button class="btn" value="cancel">Cancel</button><button class="btn primary" value="ok">${isNew ? "Add WAD" : "Save"}</button></div></form>`;
   d.showModal();
@@ -768,7 +768,7 @@ function viewWad(id, app = $("#app")) {
   const sum = k => w[k] ?? (maps.some(m => m[k] != null) ? maps.reduce((a, m) => a + (m[k] || 0), 0) : null);
   const times = maps.map(m => m.uvTime).filter(Boolean);
   app.innerHTML = `
-  <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs" : "WAD Catalog"}</a><span>/</span><span>${esc(w.title)}</span></div>
+  <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs and Official Releases" : "WAD Catalog"}</a><span>/</span><span>${esc(w.title)}</span></div>
   ${wadPager(w)}
   <div class="hero">
     <div class="stack" style="gap:10px">${picHTML(w, "", true)}
@@ -776,7 +776,7 @@ function viewWad(id, app = $("#app")) {
     </div>
     <div style="min-width:0">
       <div class="row" style="justify-content:space-between;align-items:flex-start"><div class="stack" style="gap:6px;min-width:0">
-        <span class="eyebrow">${w.isIWAD ? "IWAD" : "PWAD"} · ${esc(w.iwad)}</span><h1>${esc(w.title)}</h1>
+        <span class="eyebrow">${w.isIWAD ? "Official release" : "PWAD"} · ${esc(w.iwad)}</span><h1>${esc(w.title)}</h1>
         <span class="muted" style="font-size:17px">${esc(w.authors || "Unknown mapper")}</span></div>
         ${EDIT ? `<button class="btn small" id="editWad" type="button">Edit details</button>` : ""}</div>
       <div class="facts">
@@ -856,7 +856,7 @@ function viewMap(wid, mid, app = $("#app")) {
     ${EDIT && m[k] != null ? `<button type="button" data-grade="${k}" data-v="" title="Clear grade">✕</button>` : ""}</div></div>`;
   const stripIdx = EDIT ? shots.map((_, i) => i) : filled;
   app.innerHTML = `
-  <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs" : "WAD Catalog"}</a><span>/</span><a href="#wad--${w.id}">${esc(w.title)}</a><span>/</span><span>${esc(m.slot)}</span></div>
+  <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs and Official Releases" : "WAD Catalog"}</a><span>/</span><a href="#wad--${w.id}">${esc(w.title)}</a><span>/</span><span>${esc(m.slot)}</span></div>
   <section class="stack" style="gap:10px">
     <div><span class="slot" style="font-size:18px">${esc(m.slot)}</span> <span class="muted">· ${esc(w.title)}</span></div>
     ${EDIT ? `<input class="mapname-big" data-f="name" value="${esc(m.name)}" placeholder="Map name" aria-label="Map name" style="background:transparent;border:1px dashed var(--line);border-radius:6px;padding:0 8px;width:100%">` : `<h1 class="mapname-big">${esc(m.name || "Untitled")}</h1>`}
