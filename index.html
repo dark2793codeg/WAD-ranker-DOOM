@@ -167,7 +167,7 @@ table.maplist{font-size:13.5px}
 table.maplist th,table.maplist td{padding:8px 8px}
 table.maplist td{white-space:normal}
 table.maplist .ctr{text-align:center}
-table.maplist td.c-map{min-width:150px}
+table.maplist td.c-map{min-width:215px}
 table.maplist td.c-midi{min-width:120px;font-size:13px}
 table.maplist .sub{font-size:12px;color:var(--muted);line-height:1.3;margin-top:2px}
 table.maplist td.ctr .g{min-width:30px;height:22px;font-size:12px}
@@ -178,6 +178,14 @@ table.maplist .ed:hover{background:#ffffff0a}
 table.maplist .ed:focus{background:var(--bg);box-shadow:0 0 0 1px var(--brass);border-bottom-color:transparent}
 table.maplist .ed:empty::before{content:attr(data-ph);color:var(--dim);font-style:italic}
 table.maplist .mapname-ed{font-weight:600;font-size:15px;color:var(--fg)}
+table.maplist .mapcell{display:flex;align-items:center;gap:10px}
+table.maplist .mtext{min-width:0}
+.mthumb{flex:none;display:block;width:80px;aspect-ratio:16/9;border-radius:4px;overflow:hidden;background:var(--panel-2);border:1px solid var(--line);position:relative}
+.mthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.mthumb.empty{background:var(--panel-2) repeating-linear-gradient(45deg,#0000 0 6px,#ffffff05 6px 12px)}
+button.mthumb{cursor:pointer;color:var(--dim);font-size:18px;padding:0}
+button.mthumb:hover{color:var(--brass);border-color:var(--brass)}
+a.mthumb:hover{border-color:var(--brass)}
 table.maplist .namecell{display:flex;align-items:baseline;gap:6px}
 table.maplist .open{color:var(--muted);text-decoration:none;font-size:13px;padding:0 3px;border-radius:3px}
 table.maplist .open:hover{color:var(--brass)}
@@ -785,6 +793,13 @@ function confirmBox(msg, label, onYes) {
 }
 
 /* ---------- WAD PAGE ---------- */
+/* Spawn-point thumbnail beside each map in the list. In edit mode an empty one uploads the spawn shot. */
+function spawnThumb(w, m, edit) {
+  const src = m.shots?.[0];
+  if (src) return `<a class="mthumb" href="#map--${w.id}--${m.id}" title="Spawn point"><img src="${src}" alt="${esc(m.name || m.slot)} spawn point" loading="lazy"></a>`;
+  if (edit) return `<button type="button" class="mthumb empty" data-spawn="${m.id}" title="Add spawn point screenshot" aria-label="Add spawn point screenshot for ${esc(m.name || m.slot)}">+</button>`;
+  return `<a class="mthumb empty" href="#map--${w.id}--${m.id}" aria-hidden="true" tabindex="-1"></a>`;
+}
 /* Map list in edit mode: every field edits in place and writes to the same map record the map page shows */
 const NUM_FIELDS = new Set(["kills", "items", "secrets", "attempts"]);
 const ed = (m, f, val, ph, cls = "") => `<span class="ed ${cls}" contenteditable="true" spellcheck="false" data-mid="${m.id}" data-f="${f}" data-ph="${esc(ph)}" role="textbox" aria-label="${esc(ph)}">${esc(val ?? "")}</span>`;
@@ -795,7 +810,7 @@ function gradeSel(m, f, scale, label) {
 function editRow(w, m) {
   return `<tr class="${m.demo === "Complete" ? "done" : ""} editing">
     <td class="c-slot">${ed(m, "slot", m.slot, "Slot", "slot")}</td>
-    <td class="c-map"><div class="namecell">${ed(m, "name", m.name, "Map name", "mapname-ed")}<a class="open" href="#map--${w.id}--${m.id}" title="Open map page" aria-label="Open ${esc(m.name || m.slot)} page">↗</a></div><div class="sub">${ed(m, "authors", m.authors, "Author(s)")}</div></td>
+    <td class="c-map"><div class="mapcell">${spawnThumb(w, m, true)}<div class="mtext"><div class="namecell">${ed(m, "name", m.name, "Map name", "mapname-ed")}<a class="open" href="#map--${w.id}--${m.id}" title="Open map page" aria-label="Open ${esc(m.name || m.slot)} page">↗</a></div><div class="sub">${ed(m, "authors", m.authors, "Author(s)")}</div></div></div></td>
     <td class="c-midi" data-l="Music track">${ed(m, "midi", m.midi, "MIDI name")}<div class="sub">${ed(m, "midiBy", m.midiBy, "MIDI author(s)")}</div></td>
     <td class="ctr" data-l="Quality">${gradeSel(m, "q", Q_SCALE, "Quality")}</td>
     <td class="ctr" data-l="Difficulty">${gradeSel(m, "d", D_SCALE, "Difficulty")}</td>
@@ -829,6 +844,11 @@ function bindMapListEditing(app, w) {
     const m = mapOf(sel), f = sel.dataset.f;
     m[f] = f === "rank" ? sel.value : sel.value === "" ? null : +sel.value;
     save(); rerender();
+  }));
+  $$("button[data-spawn]", app).forEach(b => b.addEventListener("click", async () => {
+    const m = w.maps.find(x => x.id === b.dataset.spawn);
+    const url = await pickImage(1920, 1280); if (!url) return;
+    m.shots = m.shots || []; m.shots[0] = url; save(); rerender();
   }));
   $$("button.cyc", app).forEach(b => b.addEventListener("click", () => {
     const m = mapOf(b), f = b.dataset.cyc;
@@ -907,7 +927,7 @@ function viewWad(id, app = $("#app")) {
     <th class="num" title="Kills / Items / Secrets">K / I / S</th><th class="ctr" title="Casual UV-max with saves">Max</th><th class="ctr" title="Demo status">Demo</th><th class="num" title="Demo attempts">Tries</th><th>Index</th><th class="num" title="UV-max time">Time</th>${EDIT ? "<th></th>" : ""}
   </tr></thead><tbody>${maps.map(m => EDIT ? editRow(w, m) : `<tr class="${m.demo === "Complete" ? "done" : ""}">
     <td class="c-slot"><span class="slot">${esc(m.slot)}</span></td>
-    <td class="c-map"><a class="mapname" href="#map--${w.id}--${m.id}">${esc(m.name || "Untitled")}</a>${m.authors ? `<div class="sub">${esc(m.authors)}</div>` : ""}</td>
+    <td class="c-map"><div class="mapcell">${spawnThumb(w, m, false)}<div class="mtext"><a class="mapname" href="#map--${w.id}--${m.id}">${esc(m.name || "Untitled")}</a>${m.authors ? `<div class="sub">${esc(m.authors)}</div>` : ""}</div></div></td>
     <td class="c-midi" data-l="Music track">${m.midi ? `${esc(m.midi)}${m.midiBy ? `<div class="sub">${esc(m.midiBy)}</div>` : ""}` : `<span class="sub">—</span>`}</td>
     <td class="ctr" data-l="Quality">${gradeCell(m.q, Q_SCALE)}</td>
     <td class="ctr" data-l="Difficulty">${gradeCell(m.d, D_SCALE)}</td>
