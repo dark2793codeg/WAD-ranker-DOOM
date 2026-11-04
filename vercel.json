@@ -1,5 +1,5 @@
 {
   "headers": [
-    { "source": "/api/(state|me|login|upload)", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }
+    { "source": "/api/(me|login|upload)", "headers": [{ "key": "Cache-Control", "value": "no-store" }] }
   ]
 }
