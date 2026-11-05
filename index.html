@@ -178,6 +178,7 @@ table.maplist .ed:hover{background:#ffffff0a}
 table.maplist .ed:focus{background:var(--bg);box-shadow:0 0 0 1px var(--brass);border-bottom-color:transparent}
 table.maplist .ed:empty::before{content:attr(data-ph);color:var(--dim);font-style:italic}
 table.maplist .mapname-ed{font-weight:600;font-size:15px;color:var(--fg)}
+.reconnect{position:sticky;top:0;z-index:50;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 16px;background:var(--panel-2);border-bottom:1px solid var(--brass);font-size:14px}
 table.maplist .mapcell{display:flex;align-items:center;gap:10px}
 table.maplist .mtext{min-width:0}
 .mthumb{flex:none;display:block;width:80px;aspect-ratio:16/9;border-radius:4px;overflow:hidden;background:var(--panel-2);border:1px solid var(--line);position:relative}
@@ -420,8 +421,34 @@ const save = () => {
     }, ME.dataStore === "blob" ? 8000 : 1500);
     return;
   }
-  saveTimer = setTimeout(async () => { persistOK = await DB.set("state", S); if (!persistOK) toast("Couldn't save in this browser. Use Backup to keep your changes."); }, 300);
+  saveTimer = setTimeout(async () => {
+    S.savedAt = new Date().toISOString();
+    persistOK = await DB.set("state", S); if (!persistOK && !FILE.ok) toast("Couldn't save in this browser. Use Backup to keep your changes.");
+    if (FILE.ok) await FILE.write();
+  }, FILE.ok ? 800 : 300);
 };
+/* LOCAL mode: optionally keep the catalog in a real file on this computer (Chrome / Edge File System Access) */
+const FILE = {
+  h: null, ok: false, supported: "showSaveFilePicker" in window,
+  async init() { this.h = await DB.get("fileHandle") || null; if (!this.h) return "none"; try { const p = await this.h.queryPermission({ mode: "readwrite" }); this.ok = p === "granted"; return p; } catch { return "none"; } },
+  async read() { const t = await (await this.h.getFile()).text(); if (!t.trim()) return null; const o = JSON.parse(t); if (!Array.isArray(o.wads)) throw new Error("not a WAD Ranker file"); return o; },
+  async write() {
+    try { setSaveState("Saving to " + this.h.name + "…"); const w = await this.h.createWritable(); await w.write(JSON.stringify(S)); await w.close(); setSaveState("Saved to " + this.h.name); }
+    catch (e) { this.ok = false; setSaveState("Not saved to file: " + (e.message || e), true); showReconnect(); }
+  },
+  async link(h) { this.h = h; await DB.set("fileHandle", h); this.ok = (await h.requestPermission({ mode: "readwrite" })) === "granted"; },
+  async unlink() { this.h = null; this.ok = false; await DB.set("fileHandle", null); setSaveState(""); }
+};
+const newer = (a, b) => (a?.savedAt || "") >= (b?.savedAt || "");
+/* Pick whichever copy (file or browser) was saved last */
+async function adoptFile() { const o = await FILE.read(); if (o && (!S || newer(o, S))) { S = o; await DB.set("state", S); } else await FILE.write(); }
+function showReconnect() {
+  if (!FILE.h || $("#reconnect")) return;
+  const b = document.createElement("div"); b.id = "reconnect"; b.className = "reconnect";
+  b.innerHTML = `<span>Your data file <b>${esc(FILE.h.name)}</b> needs permission again before changes save to it.</span><button class="btn primary" type="button">Reconnect</button>`;
+  b.querySelector("button").onclick = async () => { try { if ((await FILE.h.requestPermission({ mode: "readwrite" })) !== "granted") return; FILE.ok = true; await adoptFile(); b.remove(); setSaveState("Saved to " + FILE.h.name); render(); } catch (e) { toast("Couldn't open the file: " + (e.message || e)); } };
+  document.body.prepend(b);
+}
 window.addEventListener("beforeunload", e => { if (SERVER && /Unsaved|Saving/.test($("#saveState")?.textContent || "")) { e.preventDefault(); e.returnValue = ""; } });
 async function storeImage(dataUrl, name) {
   if (!SERVER || !dataUrl || !dataUrl.startsWith("data:")) return dataUrl;
@@ -1098,10 +1125,19 @@ $("#dataBtn").addEventListener("click", () => {
   <div class="row"><button type="button" class="btn primary" id="bk-dl">Download backup (.json)</button><button type="button" class="btn" id="bk-copy">Copy backup text</button>
   <label class="btn" for="bk-file">Restore from file…</label><input type="file" id="bk-file" accept="application/json,.json" hidden></div>
   <p class="muted" style="font-size:13px;margin:0" id="bk-msg">${persistOK ? "Saving in this browser is working." : "Saving in this browser is blocked here, so download a backup before closing the page."}</p>
+  ${SERVER ? "" : `<hr style="border:0;border-top:1px solid var(--line);width:100%">
+  <h3 style="margin:0">Data file on this computer</h3>
+  ${FILE.supported ? `<p style="margin:0">${FILE.h ? `Every change is saved to <b>${esc(FILE.h.name)}</b>${FILE.ok ? "" : " (needs reconnecting)"}. Keep that file somewhere safe, like a synced folder, and it's your whole catalog.` : "Save your catalog to a real file on your computer. After that, every change writes to it automatically, so clearing your browser can't lose anything."}</p>
+  <div class="row"><button type="button" class="btn primary" id="fl-new">${FILE.h ? "Save to a different file…" : "Save to a file on my computer…"}</button><button type="button" class="btn" id="fl-open">Open an existing data file…</button>${FILE.h ? `<button type="button" class="btn" id="fl-off">Stop using the file</button>` : ""}</div>`
+  : `<p class="muted" style="margin:0">Saving straight to a file needs Chrome or Edge. In this browser, download a backup now and then.</p>`}`}
   <hr style="border:0;border-top:1px solid var(--line);width:100%">
   <div class="row"><button type="button" class="btn danger" id="bk-reset">Reset to spreadsheet data</button><span class="muted" style="font-size:13px">Replaces everything with the original Doom_Catalog import.</span></div></div></form>`;
   d.showModal();
   const json = () => JSON.stringify(S);
+  const fileOpts = { types: [{ description: "WAD Ranker data", accept: { "application/json": [".json"] } }] };
+  if ($("#fl-new")) $("#fl-new").onclick = async () => { try { const h = await showSaveFilePicker({ ...fileOpts, suggestedName: "wad-ranker-data.json" }); await FILE.link(h); await FILE.write(); $("#reconnect")?.remove(); d.close(); toast("Saving to " + h.name); } catch (e) { if (e.name !== "AbortError") toast("Couldn't use that file: " + e.message); } };
+  if ($("#fl-open")) $("#fl-open").onclick = async () => { try { const [h] = await showOpenFilePicker(fileOpts); const o = JSON.parse(await (await h.getFile()).text()); if (!Array.isArray(o.wads)) throw new Error("that isn't a WAD Ranker file"); await FILE.link(h); S = o; await DB.set("state", S); $("#reconnect")?.remove(); d.close(); render(); toast("Opened " + h.name); } catch (e) { if (e.name !== "AbortError") toast("Couldn't open it: " + e.message); } };
+  if ($("#fl-off")) $("#fl-off").onclick = async () => { await FILE.unlink(); $("#reconnect")?.remove(); d.close(); toast("Changes now save in this browser only"); };
   $("#bk-dl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([json()], { type: "application/json" })); a.download = `wad-ranker-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click(); $("#bk-msg").textContent = "If no file appeared, this preview blocks downloads. Use Copy backup text instead."; };
   $("#bk-copy").onclick = () => navigator.clipboard.writeText(json()).then(() => $("#bk-msg").textContent = "Backup copied. Paste it into a .json file to keep it.", () => $("#bk-msg").textContent = "Copy was blocked here. Try Download instead.");
   $("#bk-file").onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(async t => { let o; try { o = JSON.parse(t); if (!Array.isArray(o.wads)) throw 0; } catch { $("#bk-msg").textContent = "That file isn't a WAD Ranker backup or seed file."; return; }
@@ -1112,6 +1148,14 @@ $("#dataBtn").addEventListener("click", () => {
   $("#bk-reset").onclick = () => confirmBox("Replace everything (reviews, screenshots, list edits) with the original spreadsheet import?", "Reset", async () => { try { S = buildFromSeed(await loadSeed()); } catch { toast("Use Restore and pick seed.json instead"); return; } save(); render(); toast("Reset to spreadsheet data"); });
 });
 
+/* Opened straight from disk with nothing saved yet: seed.json can't be fetched from a file:// page, so ask for a file */
+function localSetup() {
+  $("#app").innerHTML = `<div class="notice"><h2>Load your catalog</h2>
+    <p style="margin:0">Pick your backup file (or <b>seed.json</b> from this folder, the spreadsheet import).${FILE.supported ? " Then open <b>Backup</b> and choose <b>Save to a file on my computer</b> so every change lands in a real file." : ""}</p>
+    <div class="row"><label class="btn primary" for="ls-file">Choose file…</label><input type="file" id="ls-file" accept=".json,application/json" hidden></div>
+    <p class="muted" id="ls-msg" style="margin:0;font-size:14px"></p></div>`;
+  $("#ls-file").onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { try { let o = JSON.parse(t); if (!Array.isArray(o.wads)) throw 0; if (!o.about) o = buildFromSeed(o); S = o; save(); render(); toast(`Loaded ${S.wads.length} WADs`); } catch { $("#ls-msg").textContent = "That file isn't a WAD Ranker backup or seed file."; } }); };
+}
 async function loadSeed() { const r = await fetch("seed.json"); if (!r.ok) throw new Error("no seed"); return r.json(); }
 function setupScreen(oldErr) {
   $("#app").innerHTML = ADMIN ? `<div class="notice"><h2>Load your catalog</h2>
@@ -1138,7 +1182,10 @@ function setupScreen(oldErr) {
   }
   await DB.open();
   S = await DB.get("state");
-  if (!S) { try { S = buildFromSeed(await loadSeed()); save(); } catch (e) { $("#app").innerHTML = `<p class="loading">Couldn't load the catalog data (seed.json).</p>`; return; } }
+  const perm = await FILE.init();
+  if (FILE.ok) { try { await adoptFile(); setSaveState("Saved to " + FILE.h.name); } catch (e) { toast("Couldn't read " + FILE.h.name + ": " + e.message); } }
+  else if (perm === "prompt") showReconnect();
+  if (!S) { try { S = buildFromSeed(await loadSeed()); save(); } catch (e) { return localSetup(); } }
   render();
 })();
 })();
