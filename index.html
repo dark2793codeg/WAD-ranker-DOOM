@@ -178,6 +178,53 @@ table.maplist .ed:hover{background:#ffffff0a}
 table.maplist .ed:focus{background:var(--bg);box-shadow:0 0 0 1px var(--brass);border-bottom-color:transparent}
 table.maplist .ed:empty::before{content:attr(data-ph);color:var(--dim);font-style:italic}
 table.maplist .mapname-ed{font-weight:600;font-size:15px;color:var(--fg)}
+/* map page info block */
+.mapsheet{display:flex;flex-direction:column;gap:8px}
+.ms-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ms-id{display:flex;align-items:center;gap:10px;font-size:15px}
+.ms-slot{font:700 15px/1 var(--f-display);color:var(--brass-ink);background:var(--brass);border-radius:4px;padding:6px 9px;letter-spacing:.04em;border:0;width:auto}
+input.ms-slot{width:9ch;text-transform:uppercase;text-align:center}
+.ms-grades{display:flex;gap:14px}
+.ms-g{display:flex;align-items:center;gap:6px}
+.ms-g small{font:600 10px/1 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.ms-name{margin:2px 0 10px}
+input.ms-name{background:transparent;border:0;border-bottom:2px dashed var(--line);border-radius:0;padding:0;width:100%;color:var(--fg)}
+input.ms-name:focus{outline:none;border-bottom-color:var(--brass)}
+.ms-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.5fr);gap:14px}
+@media (max-width:1100px){.ms-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ms-run{grid-column:1/-1}}
+@media (max-width:640px){.ms-grid{grid-template-columns:minmax(0,1fr)}.runs{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.ms-card{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--brass);border-radius:8px;padding:14px 16px 16px;min-width:0}
+.ms-card h3{margin:0 0 12px;font:700 12px/1 var(--f-display);letter-spacing:.16em;text-transform:uppercase;color:var(--brass)}
+.ms-card label{cursor:default}
+.ms-card input,.ms-card select{font:inherit;color:var(--fg);background:transparent;border:0;border-bottom:1px dashed var(--line);border-radius:0;padding:2px 0;width:100%;min-width:0}
+.ms-card input:hover,.ms-card select:hover{border-bottom-color:var(--muted)}
+.ms-card input:focus,.ms-card select:focus{outline:none;border-bottom:1px solid var(--brass);background:#ffffff06}
+.ms-card input::placeholder{color:var(--dim);font-style:italic}
+.ms-card option{background:var(--panel);color:var(--fg)}
+.crow{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:baseline;gap:10px;padding:7px 0;border-bottom:1px solid #ffffff0a}
+.crow:last-child{border-bottom:0}
+.crow>span,.rstat>span{font:600 10.5px/1.2 var(--f-body);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.crow b{font:500 16px/1.3 var(--f-body);overflow-wrap:anywhere}
+.crow input{font:500 16px/1.3 var(--f-body)}
+.tally{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:var(--bg);border:2px solid var(--line);border-radius:6px}
+.tcell{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px 12px;border-right:2px solid var(--line);min-width:0}
+.tcell:last-child{border-right:0}
+.tcell b,.tcell input{font:700 clamp(24px,2.6vw,34px)/1 var(--f-display);color:var(--blood);font-variant-numeric:tabular-nums;text-align:center}
+.tcell input{-moz-appearance:textfield}
+.tcell input::-webkit-inner-spin-button,.tcell input::-webkit-outer-spin-button,.rstat input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.tcell span{font:600 10px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.runs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);gap:14px 18px;align-items:start}
+@media (max-width:640px){.runs{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.rstat{display:flex;flex-direction:column;gap:7px;min-width:0}
+.rstat>span i{font-style:normal;text-transform:none;letter-spacing:0;color:var(--dim)}
+.rstat b{font:600 16px/1.2 var(--f-body)}
+.rstat small{font-size:12.5px;color:var(--muted)}
+.rstat .ms-big{font:700 24px/1 var(--f-display);font-variant-numeric:tabular-nums;color:var(--fg)}
+.ms-time .ms-big{color:var(--brass)}
+.rstat .st{align-self:flex-start}
+.ms-card select.ms-sel{cursor:pointer;font:600 14px/1.2 var(--f-body);padding:5px 8px}
+.ms-card select.ms-sel.st{border:0;border-radius:4px;padding:5px 10px;width:auto;max-width:100%}
+.ms-card select.ms-sel.st:not(.ok):not(.st-rt):not(.no){background:var(--panel-2)}
 .reconnect{position:sticky;top:0;z-index:50;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 16px;background:var(--panel-2);border-bottom:1px solid var(--brass);font-size:14px}
 table.maplist .mapcell{display:flex;align-items:center;gap:10px}
 table.maplist .mtext{min-width:0}
@@ -1001,7 +1048,9 @@ function viewMap(wid, mid, app = $("#app")) {
   const cur = shotSel.i, src = shots[cur];
   const fld = (k, label, type = "text", wide) => `<label class="field ${wide ? "wide" : ""}"><span>${label}</span><input data-f="${k}" type="${type === "tm" ? "text" : type}" value="${esc(type === "tm" ? fmtTime(m[k]) : m[k] ?? "")}" ${type === "tm" ? 'placeholder="m:ss" inputmode="numeric"' : ""}></label>`;
   const sel = (k, label, arr) => `<label class="field"><span>${label}</span><select data-f="${k}"><option value=""></option>${arr.map(x => `<option ${m[k] === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></label>`;
-  const fact = (l, v) => `<div class="fact"><div class="k">${l}</div><div class="v">${v || "—"}</div></div>`;
+  const msRow = (l, k, ph, icon = "") => `<label class="crow"><span>${l}</span>${EDIT ? `<input data-f="${k}" value="${esc(m[k] ?? "")}" placeholder="${ph}">` : `<b>${m[k] ? icon + (icon ? " " : "") + esc(m[k]) : "—"}</b>`}</label>`;
+  const stCls = v => /^Complete/.test(v || "") ? "ok" : /Routing|Progress/.test(v || "") ? "st-rt" : "no";
+  const msStat = (l, k, opts, note) => `<label class="rstat"><span>${l}${note ? ` <i>${note}</i>` : ""}</span>${EDIT ? `<select data-f="${k}" class="ms-sel st ${m[k] ? stCls(m[k]) : ""}">${k === "casual" ? `<option value=""></option>` : ""}${opts.map(x => `<option ${m[k] === x ? "selected" : ""}>${esc(x)}</option>`).join("")}</select>` : statusChip(m[k])}</label>`;
   const ladder = (k, scale, title) => `<div class="score"><span class="lbl">${title}</span>
     <div class="line">${gradeChip(m[k], scale, true)}<span class="gnum">${m[k] != null ? fmtN(m[k]) + " / 10" : "Ungraded"}</span></div>
     <div class="ladder" role="group" aria-label="${title}">${scale.map(([l, n]) => `<button type="button" data-grade="${k}" data-v="${n}" class="${letter(m[k], scale) === l ? "on g " + l[0] : ""}" ${EDIT ? "" : "disabled"}>${l}</button>`).join("")}
@@ -1009,16 +1058,29 @@ function viewMap(wid, mid, app = $("#app")) {
   const stripIdx = EDIT ? shots.map((_, i) => i) : filled;
   app.innerHTML = `
   <div class="crumbs"><a href="#${w.isIWAD ? "iwads" : "wads"}">${w.isIWAD ? "IWADs and Official Releases" : "WAD Catalog"}</a><span>/</span><a href="#wad--${w.id}">${esc(w.title)}</a><span>/</span><span>${esc(m.slot)}</span></div>
-  <section class="stack" style="gap:10px">
-    <div><span class="slot" style="font-size:18px">${esc(m.slot)}</span> <span class="muted">· ${esc(w.title)}</span></div>
-    ${EDIT ? `<input class="mapname-big" data-f="name" value="${esc(m.name)}" placeholder="Map name" aria-label="Map name" style="background:transparent;border:1px dashed var(--line);border-radius:6px;padding:0 8px;width:100%">` : `<h1 class="mapname-big">${esc(m.name || "Untitled")}</h1>`}
-    ${EDIT ? `<div class="form" style="margin-top:6px">${fld("slot", "Map slot")}${fld("authors", "Map author(s)")}${fld("midi", "MIDI name")}${fld("midiBy", "MIDI author(s)")}
-      ${fld("kills", "Kills", "number")}${fld("items", "Items", "number")}${fld("secrets", "Secrets", "number")}
-      ${sel("casual", "Casual max? (w/ saves)", ["Complete", "Incomplete"])}${sel("demo", "Demo status", MAP_DEMO)}${fld("attempts", "Demo attempts", "number")}
-      ${sel("rank", "Index rank", INDEX.map(x => x[0]))}${fld("uvTime", "UV-max time", "tm")}</div>`
-    : `<div class="facts">${fact("Map author(s)", esc(m.authors))}${fact("MIDI", esc(m.midi))}${fact("MIDI author(s)", esc(m.midiBy))}
-      ${fact("Kills / Items / Secrets", [m.kills, m.items, m.secrets].map(x => x ?? "—").join(" / "))}${fact("Quality / Difficulty", `${gradeChip(m.q, Q_SCALE)} ${gradeChip(m.d, D_SCALE)}`)}${fact("Casual max", statusChip(m.casual))}${fact("Demo", statusChip(m.demo))}
-      ${fact("Demo attempts", m.attempts)}${fact("Index rank", esc(m.rank) + (m.rank ? ` <span class="muted">(${INDEX_PTS[m.rank]} pts)</span>` : ""))}${fact("UV-max time", fmtTime(m.uvTime))}</div>`}
+  <section class="mapsheet">
+    <div class="ms-top">
+      <div class="ms-id">${EDIT ? `<input class="ms-slot" data-f="slot" value="${esc(m.slot)}" aria-label="Map slot" placeholder="SLOT">` : `<span class="ms-slot">${esc(m.slot)}</span>`}<span class="muted">${esc(w.title)}</span></div>
+      ${EDIT ? "" : `<div class="ms-grades">${[["q", Q_SCALE, "Quality"], ["d", D_SCALE, "Difficulty"], ["m", Q_SCALE, "Music"]].map(([k, sc, l]) => `<span class="ms-g"><small>${l}</small>${gradeChip(m[k], sc)}</span>`).join("")}</div>`}
+    </div>
+    ${EDIT ? `<input class="mapname-big ms-name" data-f="name" value="${esc(m.name)}" placeholder="Map name" aria-label="Map name">` : `<h1 class="mapname-big ms-name">${esc(m.name || "Untitled")}</h1>`}
+    <div class="ms-grid">
+      <div class="ms-card ms-credits"><h3>Credits</h3>
+        ${msRow("Map author(s)", "authors", "Who made it")}
+        ${msRow("MIDI", "midi", "Track name", "♪")}
+        ${msRow("MIDI author(s)", "midiBy", "Who composed it")}
+      </div>
+      <div class="ms-card ms-tally"><h3>Tally</h3><div class="tally">
+        ${[["kills", "Kills"], ["items", "Items"], ["secrets", "Secrets"]].map(([k, l]) => `<label class="tcell"><b>${EDIT ? `<input data-f="${k}" type="number" min="0" value="${m[k] ?? ""}" placeholder="—" aria-label="${l}">` : m[k] ?? "—"}</b><span>${l}</span></label>`).join("")}
+      </div></div>
+      <div class="ms-card ms-run"><h3>Run</h3><div class="runs">
+        ${msStat("Casual max", "casual", ["Complete", "Incomplete"], "w/ saves")}
+        ${msStat("Demo", "demo", MAP_DEMO)}
+        <label class="rstat"><span>Index rank</span>${EDIT ? `<select data-f="rank" class="ms-sel"><option value="">—</option>${INDEX.map(([r]) => `<option ${m.rank === r ? "selected" : ""}>${esc(r)}</option>`).join("")}</select>` : `<b>${esc(m.rank) || "—"}</b>`}${m.rank ? `<small>${(INDEX_PTS[m.rank] || 0).toLocaleString()} pts${m.demo === "Complete" ? "" : " (not banked)"}</small>` : ""}</label>
+        <label class="rstat"><span>Attempts</span>${EDIT ? `<input data-f="attempts" type="number" min="0" class="ms-big" value="${m.attempts ?? ""}" placeholder="—">` : `<b class="ms-big">${m.attempts ?? "—"}</b>`}</label>
+        <label class="rstat ms-time"><span>UV-max time</span>${EDIT ? `<input data-f="uvTime" class="ms-big" value="${esc(fmtTime(m.uvTime))}" placeholder="m:ss" inputmode="numeric">` : `<b class="ms-big">${fmtTime(m.uvTime) || "—"}</b>`}</label>
+      </div></div>
+    </div>
   </section>
   <div style="margin-top:28px">${pagerHTML(prev, next, x => `map--${w.id}--${x.id}`, x => `${x.slot} ${x.name}`.trim(), "map")}</div>
   <section class="block" style="margin-top:18px" aria-label="Photo gallery">
@@ -1040,7 +1102,10 @@ function viewMap(wid, mid, app = $("#app")) {
     const k = inp.dataset.f, v = inp.value;
     m[k] = inp.type === "number" ? (v === "" ? null : +v) : k === "uvTime" ? parseTime(v) : v;
     if (k === "uvTime") inp.value = fmtTime(m[k]);
+    if (k === "slot") m.slot = (v.trim() || m.slot).toUpperCase();
+    if (k === "demo") syncWadDemo(w);
     save();
+    if (["casual", "demo", "rank", "slot"].includes(k)) rerender();
   }));
   app.querySelectorAll("[data-grade]").forEach(b => b.onclick = () => { m[b.dataset.grade] = b.dataset.v === "" ? null : +b.dataset.v; save(); rerender(); });
   app.querySelectorAll("label[data-addshot],button[data-addshot]").forEach(l => l.onclick = () => addShot(+l.dataset.addshot));
